@@ -1,0 +1,17 @@
+# Pinned to compatible ranges. For exact reproducibility of the canonical
+# multi-seed validation run, regenerate a `requirements.lock` from the
+# environment used to produce the published curves with `pip freeze`.
+numpy>=1.24,<3.0
+scipy>=1.10,<2.0
+matplotlib>=3.7,<4.0
+torch>=2.0,<3.0
+tqdm>=4.65,<5.0
+open_spiel>=1.4
+absl-py>=2.0,<3.0
+attrs>=23.0,<26.0
+contextlib2>=21.6,<22.0
+ml-collections>=0.1,<1.0
+pandas>=2.0,<3.0
+pillow>=10.0,<12.0
+PyYAML>=6.0,<7.0
+torchvision>=0.15,<1.0
