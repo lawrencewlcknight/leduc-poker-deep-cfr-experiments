@@ -3,11 +3,11 @@
 The trainer iterates over the seeds in the configured ``DEFAULT_SEEDS`` list
 (or the user's CLI override). For each seed it walks the
 ``checkpoint_schedule``, calling :meth:`DeepCFRSolver.solve` for the *delta*
-between successive milestones and resuming from the previous milestone's
-*full* checkpoint each time. After every stage it writes:
+between successive milestones while keeping one in-process solver alive across
+the whole schedule. After every stage it writes:
 
-* a full checkpoint, ``checkpoints/seed_<seed>_iter_<iter>_full.pt``, suitable
-  for resuming training;
+* a checkpoint, ``checkpoints/seed_<seed>_iter_<iter>_full.pt``, containing the
+  model/optimizer/training state and, optionally, replay buffers;
 * a lightweight policy snapshot, ``snapshots/seed_<seed>_iter_<iter>_snapshot.pt``,
   suitable for cheap analysis.
 
@@ -84,11 +84,6 @@ def _make_training_stages(
                 f"{schedule!r}"
             )
         additional = int(target) - int(previous)
-        load_path = (
-            checkpoints_dir / package_full_checkpoint_filename(seed, previous)
-            if previous > 0
-            else None
-        )
         save_full_path = checkpoints_dir / package_full_checkpoint_filename(seed, target)
         save_snapshot_path = snapshots_dir / package_snapshot_filename(seed, target)
         stages.append(
@@ -97,7 +92,6 @@ def _make_training_stages(
                 "previous": int(previous),
                 "target": int(target),
                 "additional": int(additional),
-                "load_path": load_path,
                 "save_full_path": save_full_path,
                 "save_snapshot_path": save_snapshot_path,
                 "policy_train_every": int(
@@ -138,7 +132,7 @@ def _cleanup_memory() -> None:
 
 def _run_stage(
     *,
-    game,
+    solver: DeepCFRSolver,
     config: Mapping[str, object],
     stage: Mapping[str, object],
     experiment_name: str,
@@ -148,11 +142,13 @@ def _run_stage(
     seed = int(stage["seed"])
     target_iteration = int(stage["target"])
     additional = int(stage["additional"])
-    load_path: Optional[Path] = stage["load_path"]  # type: ignore[assignment]
     save_full_path: Path = stage["save_full_path"]  # type: ignore[assignment]
     save_snapshot_path: Path = stage["save_snapshot_path"]  # type: ignore[assignment]
     policy_train_every = int(stage["policy_train_every"])
     label = str(stage["label"])
+    include_replay_buffers = bool(
+        config.get("save_replay_buffers_in_checkpoints", False)
+    )
 
     _LOGGER.info("=" * 80)
     _LOGGER.info(label)
@@ -160,27 +156,22 @@ def _run_stage(
 
     stage_start = time.perf_counter()
 
-    solver = DeepCFRSolver(
-        game,
-        num_iterations=additional,
-        policy_network_train_every=policy_train_every,
-        **_solver_kwargs_from_config(config),
-    )
-
-    if load_path is not None:
-        if not load_path.exists():
-            raise FileNotFoundError(
-                f"Cannot resume stage targeting {target_iteration} iters: the "
-                f"previous full checkpoint {load_path} is missing."
-            )
-        _LOGGER.info("Resuming from full checkpoint: %s", load_path)
-        solver.load_full_model(load_path, map_location="cpu")
+    solver._num_iterations = additional
+    solver._policy_network_train_every = policy_train_every
+    solver._evaluation_interval = policy_train_every
 
     result: SolveResult = solver.solve()
     stage_wall_clock = time.perf_counter() - stage_start
 
-    solver.save_full_model(save_full_path)
-    _LOGGER.info("Saved full checkpoint: %s", save_full_path)
+    solver.save_full_model(
+        save_full_path,
+        include_buffers=include_replay_buffers,
+    )
+    _LOGGER.info(
+        "Saved checkpoint: %s (include_replay_buffers=%s)",
+        save_full_path,
+        include_replay_buffers,
+    )
 
     solver.save_policy_snapshot(
         save_snapshot_path,
@@ -213,6 +204,7 @@ def _run_stage(
         "additional_iterations": additional,
         "policy_train_every": policy_train_every,
         "full_checkpoint": str(save_full_path),
+        "full_checkpoint_includes_replay_buffers": include_replay_buffers,
         "policy_snapshot": str(save_snapshot_path),
         "internal_iteration_after_stage": int(getattr(solver, "_iteration", 0)),
         "nodes_touched_total": int(getattr(solver, "_nodes_touched", 0)),
@@ -237,7 +229,7 @@ def _run_stage(
         "advantage_buffer_size_player_1": int(len(solver._advantage_memories[1])),
     }
 
-    del solver, result
+    del result
     _cleanup_memory()
     return row
 
@@ -298,11 +290,17 @@ def run_training(
             checkpoints_dir=checkpoints_dir,
             snapshots_dir=snapshots_dir,
         )
+        solver = DeepCFRSolver(
+            game,
+            num_iterations=0,
+            policy_network_train_every=1,
+            **_solver_kwargs_from_config(config),
+        )
 
         for stage in stages:
             try:
                 row = _run_stage(
-                    game=game,
+                    solver=solver,
                     config=config,
                     stage=stage,
                     experiment_name=experiment_name,
@@ -329,8 +327,10 @@ def run_training(
                     }
                 )
                 # Skip remaining stages for this seed; later stages depend on
-                # earlier full checkpoints.
+                # the solver state accumulated by earlier stages.
                 break
+        del solver
+        _cleanup_memory()
 
     return {
         "metrics_rows": metrics_rows,

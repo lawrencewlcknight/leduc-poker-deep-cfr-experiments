@@ -6,7 +6,7 @@
 
 ## Design
 
-For each seed, the experiment trains a single Deep CFR run that pauses at every milestone in the checkpoint schedule and writes a *policy snapshot* (the average-policy network plus a small metadata header). Training resumes from the previous milestone's full checkpoint, so the total compute matches a single straight-through 1,500-iteration run.
+For each seed, the experiment trains a single Deep CFR run that pauses at every milestone in the checkpoint schedule and writes a *policy snapshot* (the average-policy network plus a small metadata header). The same in-memory solver continues through the milestones, so the total compute matches a single straight-through 1,500-iteration run without repeatedly serializing and reloading Leduc replay buffers.
 
 The saved snapshots are then loaded back into an OpenSpiel `Policy` object and evaluated:
 
@@ -81,7 +81,7 @@ The run directory contains every artefact a thesis chapter needs.
 | `average_policy_value_by_checkpoint.png` | Mean average-policy value per milestone, with SE bars. |
 | `strength_vs_exploitability.png` | Annotated scatter linking equilibrium quality and head-to-head strength. |
 | `strength_vs_average_policy_value.png` | Annotated scatter linking average-policy value and head-to-head strength. |
-| `checkpoints/seed_<seed>_iter_<iter>_full.pt` | Full Deep CFR checkpoint (resumable). |
+| `checkpoints/seed_<seed>_iter_<iter>_full.pt` | Model/optimizer/training-state checkpoint. Replay buffers are omitted by default for cloud stability; set `save_replay_buffers_in_checkpoints=True` in config to include them. |
 | `snapshots/seed_<seed>_iter_<iter>_snapshot.pt` | Lightweight policy snapshot. |
 
 ## Interpretation guidance for the thesis

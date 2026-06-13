@@ -69,6 +69,11 @@ DEFAULT_CONFIG = {
     "policy_network_train_steps": 200,
     "advantage_network_train_steps": 200,
     "compute_exploitability": True,
+    # Leduc replay buffers are large enough that serializing and reloading them
+    # between every milestone can destabilize cloud VMs. Milestone checkpoints
+    # therefore keep the model/optimizer/training state by default, while the
+    # in-process solver carries replay buffers continuously through the stages.
+    "save_replay_buffers_in_checkpoints": False,
     "average_policy_value_target": DEFAULT_AVERAGE_POLICY_VALUE_TARGET,
     "exploitability_threshold": DEFAULT_EXPLOITABILITY_THRESHOLD,
     # Analysis options.
