@@ -12,7 +12,7 @@ The repository is organised so that each experiment can be run independently whi
 .
 ├── deep_cfr_poker/                                   # Shared reusable code
 │   ├── solver.py                                     # Canonical Deep CFR solver
-│   ├── networks.py                                   # MLP and Sonnet-style linear layers
+│   ├── networks.py                                   # MLP variants and Sonnet-style linear layers
 │   ├── replay.py                                     # Reservoir replay buffer
 │   ├── snapshots.py                                  # Policy snapshots + LoadedPolicy
 │   ├── evaluation.py                                 # Head-to-head + monotonicity analysis
@@ -22,6 +22,7 @@ The repository is organised so that each experiment can be run independently whi
 │   └── seeding.py                                    # Reproducibility helpers
 ├── experiments/
 │   └── leduc_poker/
+│       ├── architecture_ablation_common.py           # Shared architecture-ablation runner
 │       ├── deep_cfr_multiseed_validation/            # Experiment 1
 │       │   ├── config.py
 │       │   ├── run.py
@@ -67,9 +68,38 @@ The repository is organised so that each experiment can be run independently whi
 │       │   ├── plotting.py
 │       │   ├── run.py
 │       │   └── README.md
-│       └── deep_cfr_replay_averaging_ablation/      # Experiment 10
+│       ├── deep_cfr_replay_averaging_ablation/      # Experiment 10
+│       │   ├── config.py
+│       │   ├── plotting.py
+│       │   ├── run.py
+│       │   └── README.md
+│       ├── deep_cfr_network_size_ablation/          # Experiment 11
+│       │   ├── config.py
+│       │   ├── plotting.py
+│       │   ├── run.py
+│       │   └── README.md
+│       ├── deep_cfr_residual_network_ablation/      # Experiment 12
+│       │   ├── config.py
+│       │   ├── run.py
+│       │   └── README.md
+│       ├── deep_cfr_layer_norm_network_ablation/    # Experiment 13
+│       │   ├── config.py
+│       │   ├── run.py
+│       │   └── README.md
+│       ├── deep_cfr_network_role_ablation/          # Experiment 14
+│       │   ├── config.py
+│       │   ├── run.py
+│       │   └── README.md
+│       ├── deep_cfr_shared_trunk_head_ablation/     # Experiment 15
+│       │   ├── config.py
+│       │   ├── run.py
+│       │   └── README.md
+│       ├── deep_cfr_factorised_advantage_head_ablation/ # Experiment 16
+│       │   ├── config.py
+│       │   ├── run.py
+│       │   └── README.md
+│       └── deep_cfr_dropout_ablation/              # Experiment 17
 │           ├── config.py
-│           ├── plotting.py
 │           ├── run.py
 │           └── README.md
 ├── tests/                                            # pytest suite
@@ -169,6 +199,62 @@ Compares raw advantage targets with standardized targets, clipped targets, and s
 Compares the Experiment 2 baseline, `uniform_replay_linear_avg_exp2_baseline`, with uniform average-strategy weighting. Uniform average weighting removes the baseline CFR-style iteration weighting from the average-policy supervised loss. Priority replay variants remain available as optional exploratory arms, but are excluded from the default run because the current priority sampler is too compute intensive for the standard experiment suite.
 
 **Question:** does average-strategy target weighting improve Deep CFR stability or final average-policy quality when every other core training parameter is held fixed?
+
+### 11. Leduc poker Deep CFR network-size ablation
+
+[`experiments/leduc_poker/deep_cfr_network_size_ablation/`](experiments/leduc_poker/deep_cfr_network_size_ablation/README.md)
+
+Runs a controlled architecture grid anchored to Experiment 1. Both the advantage networks and average-policy network use hidden depths of `2`, `4`, or `8` layers and hidden widths of `8`, `16`, or `32` units, with all other solver parameters fixed. The `layers2_width32` arm is the Experiment 1 architecture and is used as the paired baseline. The default run uses three matched seeds so that the full grid completes within the 48-hour Batch runtime limit.
+
+**Question:** how sensitive is Deep CFR performance in Leduc poker to neural-network depth and width when the data-generation budget, optimiser, replay capacity, and average-policy training schedule are held fixed?
+
+### 12. Leduc poker Deep CFR residual-network ablation
+
+[`experiments/leduc_poker/deep_cfr_residual_network_ablation/`](experiments/leduc_poker/deep_cfr_residual_network_ablation/README.md)
+
+Compares plain MLPs against residual MLPs at fixed width `32` and hidden depths `2`, `4`, and `8`. Both the advantage networks and average-policy network use the same architecture within each variant.
+
+**Question:** do skip connections improve Deep CFR optimisation stability or final average-policy quality for deeper networks?
+
+### 13. Leduc poker Deep CFR layer-normalisation network ablation
+
+[`experiments/leduc_poker/deep_cfr_layer_norm_network_ablation/`](experiments/leduc_poker/deep_cfr_layer_norm_network_ablation/README.md)
+
+Compares plain MLPs, layer-normalised MLPs, and residual layer-normalised MLPs at fixed width `32` and hidden depths `2`, `4`, and `8`.
+
+**Question:** does normalising hidden activations improve Deep CFR supervised fitting stability under the same data-generation and optimiser budget?
+
+### 14. Leduc poker Deep CFR network-role ablation
+
+[`experiments/leduc_poker/deep_cfr_network_role_ablation/`](experiments/leduc_poker/deep_cfr_network_role_ablation/README.md)
+
+Varies policy-network capacity and advantage-network capacity separately. The baseline is policy `2x32`, advantage `2x32`; treatment arms shrink or deepen only one of the two network roles at a time.
+
+**Question:** is Deep CFR performance more sensitive to the average-policy network architecture or to the advantage-network architecture?
+
+### 15. Leduc poker Deep CFR shared-trunk head ablation
+
+[`experiments/leduc_poker/deep_cfr_shared_trunk_head_ablation/`](experiments/leduc_poker/deep_cfr_shared_trunk_head_ablation/README.md)
+
+Holds the average-policy network fixed at the Experiment 1 `2x32` MLP architecture and compares independent per-player advantage MLPs with a shared advantage trunk and separate player/action heads. The comparison is run at hidden depths `2`, `4`, and `8`, all at width `32`.
+
+**Question:** can shared representations across player-specific advantage approximators improve sample efficiency or optimisation stability without weakening the per-player action-value heads?
+
+### 16. Leduc poker Deep CFR factorised advantage-head ablation
+
+[`experiments/leduc_poker/deep_cfr_factorised_advantage_head_ablation/`](experiments/leduc_poker/deep_cfr_factorised_advantage_head_ablation/README.md)
+
+Holds the average-policy network fixed at the Experiment 1 `2x32` MLP architecture and compares direct action outputs with centred action-advantage outputs and dueling-style state-value-plus-action-advantage outputs. The comparison is run at hidden depths `2`, `4`, and `8`, all at width `32`.
+
+**Question:** does imposing a value/advantage factorisation on the advantage approximator improve Deep CFR optimisation stability or final average-policy quality?
+
+### 17. Leduc poker Deep CFR dropout ablation
+
+[`experiments/leduc_poker/deep_cfr_dropout_ablation/`](experiments/leduc_poker/deep_cfr_dropout_ablation/README.md)
+
+Runs a negative/control-style regularisation test. The average-policy network is fixed at the Experiment 1 `2x32` MLP architecture, while dropout is applied only inside the advantage networks during supervised fitting. The comparison uses dropout probabilities `0.00`, `0.05`, `0.10`, and `0.20` at advantage-network depths `2` and `8`.
+
+**Question:** does dropout regularisation improve advantage fitting and final average-policy quality, or does it mainly add noise to an already stochastic Deep CFR training signal?
 
 ## Setup
 
@@ -347,6 +433,133 @@ python -m experiments.leduc_poker.deep_cfr_replay_averaging_ablation.run \
   --batch-size-strategy 2 \
   --memory-capacity 256 \
   --output-root outputs/smoke_tests
+
+# Experiment 11 — network-size ablation
+python -m experiments.leduc_poker.deep_cfr_network_size_ablation.run
+
+# Experiment 11 — quick smoke test
+python -m experiments.leduc_poker.deep_cfr_network_size_ablation.run \
+  --seeds 1234 \
+  --iterations 3 \
+  --traversals 4 \
+  --evaluation-interval 1 \
+  --policy-network-train-every 1 \
+  --depths 2,4 \
+  --widths 8 \
+  --policy-network-train-steps 1 \
+  --advantage-network-train-steps 1 \
+  --batch-size-advantage 2 \
+  --batch-size-strategy 2 \
+  --memory-capacity 256 \
+  --output-root outputs/smoke_tests
+
+# Experiment 12 — residual-network ablation
+python -m experiments.leduc_poker.deep_cfr_residual_network_ablation.run
+
+# Experiment 12 — quick smoke test
+python -m experiments.leduc_poker.deep_cfr_residual_network_ablation.run \
+  --seeds 1234 \
+  --iterations 3 \
+  --traversals 4 \
+  --evaluation-interval 1 \
+  --policy-network-train-every 1 \
+  --variant-ids plain_layers2_width32,residual_layers2_width32 \
+  --policy-network-train-steps 1 \
+  --advantage-network-train-steps 1 \
+  --batch-size-advantage 2 \
+  --batch-size-strategy 2 \
+  --memory-capacity 256 \
+  --output-root outputs/smoke_tests
+
+# Experiment 13 — layer-normalisation network ablation
+python -m experiments.leduc_poker.deep_cfr_layer_norm_network_ablation.run
+
+# Experiment 13 — quick smoke test
+python -m experiments.leduc_poker.deep_cfr_layer_norm_network_ablation.run \
+  --seeds 1234 \
+  --iterations 3 \
+  --traversals 4 \
+  --evaluation-interval 1 \
+  --policy-network-train-every 1 \
+  --variant-ids plain_layers2_width32,layer_norm_layers2_width32,residual_layer_norm_layers2_width32 \
+  --policy-network-train-steps 1 \
+  --advantage-network-train-steps 1 \
+  --batch-size-advantage 2 \
+  --batch-size-strategy 2 \
+  --memory-capacity 256 \
+  --output-root outputs/smoke_tests
+
+# Experiment 14 — network-role ablation
+python -m experiments.leduc_poker.deep_cfr_network_role_ablation.run
+
+# Experiment 14 — quick smoke test
+python -m experiments.leduc_poker.deep_cfr_network_role_ablation.run \
+  --seeds 1234 \
+  --iterations 3 \
+  --traversals 4 \
+  --evaluation-interval 1 \
+  --policy-network-train-every 1 \
+  --variant-ids baseline_policy2x32_advantage2x32,small_policy_baseline_advantage,baseline_policy_small_advantage \
+  --policy-network-train-steps 1 \
+  --advantage-network-train-steps 1 \
+  --batch-size-advantage 2 \
+  --batch-size-strategy 2 \
+  --memory-capacity 256 \
+  --output-root outputs/smoke_tests
+
+# Experiment 15 — shared-trunk head ablation
+python -m experiments.leduc_poker.deep_cfr_shared_trunk_head_ablation.run
+
+# Experiment 15 — quick smoke test
+python -m experiments.leduc_poker.deep_cfr_shared_trunk_head_ablation.run \
+  --seeds 1234 \
+  --iterations 3 \
+  --traversals 4 \
+  --evaluation-interval 1 \
+  --policy-network-train-every 1 \
+  --variant-ids independent_advantage_layers2_width32,shared_trunk_advantage_layers2_width32 \
+  --policy-network-train-steps 1 \
+  --advantage-network-train-steps 1 \
+  --batch-size-advantage 2 \
+  --batch-size-strategy 2 \
+  --memory-capacity 256 \
+  --output-root outputs/smoke_tests
+
+# Experiment 16 — factorised advantage-head ablation
+python -m experiments.leduc_poker.deep_cfr_factorised_advantage_head_ablation.run
+
+# Experiment 16 — quick smoke test
+python -m experiments.leduc_poker.deep_cfr_factorised_advantage_head_ablation.run \
+  --seeds 1234 \
+  --iterations 3 \
+  --traversals 4 \
+  --evaluation-interval 1 \
+  --policy-network-train-every 1 \
+  --variant-ids direct_advantage_layers2_width32,centered_advantage_layers2_width32,dueling_advantage_layers2_width32 \
+  --policy-network-train-steps 1 \
+  --advantage-network-train-steps 1 \
+  --batch-size-advantage 2 \
+  --batch-size-strategy 2 \
+  --memory-capacity 256 \
+  --output-root outputs/smoke_tests
+
+# Experiment 17 — dropout ablation
+python -m experiments.leduc_poker.deep_cfr_dropout_ablation.run
+
+# Experiment 17 — quick smoke test
+python -m experiments.leduc_poker.deep_cfr_dropout_ablation.run \
+  --seeds 1234 \
+  --iterations 3 \
+  --traversals 4 \
+  --evaluation-interval 1 \
+  --policy-network-train-every 1 \
+  --variant-ids dropout_p00_advantage_layers2_width32,dropout_p05_advantage_layers2_width32 \
+  --policy-network-train-steps 1 \
+  --advantage-network-train-steps 1 \
+  --batch-size-advantage 2 \
+  --batch-size-strategy 2 \
+  --memory-capacity 256 \
+  --output-root outputs/smoke_tests
 ```
 
 Each CLI exposes overrides for the most commonly varied configuration values. See `--help` for the per-experiment flag list, and the experiment's own README for the full output catalogue.
@@ -375,4 +588,4 @@ is documented in [`docs/THESIS_ARTIFACTS.md`](docs/THESIS_ARTIFACTS.md).
 
 ## Academic interpretation
 
-Exploitability is the primary equilibrium-quality metric. Policy-value error and neural-network losses are useful diagnostics, but they should not be interpreted as evidence of Nash-equilibrium convergence on their own. Head-to-head expected value (experiment 2) is a separate, complementary signal: a low-exploitability checkpoint may still lose to specific earlier checkpoints in direct play. Policy-training frequency and final-only extraction (experiments 3 and 4) change the supervised fitting budget and timing for the average-policy network, advantage-network reinitialisation (experiment 5) changes the regret-approximation optimisation path, the fair warm-start ablation (experiment 6) tests checkpoint/resume fidelity, the learning-rate schedule ablation (experiment 7) changes the optimiser trajectory while holding the Deep CFR data-generation protocol fixed, the constrained random search (experiment 8) screens multiple implementation and optimisation choices under a practical compute budget, the target-processing ablation (experiment 9) changes only the supervised advantage-network targets seen during fitting, and the replay/averaging ablation (experiment 10) changes only average-policy target weighting by default. In the thesis, report exploitability, head-to-head strength, supervised update budget, checkpoint fidelity, optimiser schedule, search-stage uncertainty, target-processing diagnostics, optional replay diagnostics, and paired ablation differences as distinct quantities, and treat contrasts between them as empirical results rather than failure modes.
+Exploitability is the primary equilibrium-quality metric. Policy-value error and neural-network losses are useful diagnostics, but they should not be interpreted as evidence of Nash-equilibrium convergence on their own. Head-to-head expected value (experiment 2) is a separate, complementary signal: a low-exploitability checkpoint may still lose to specific earlier checkpoints in direct play. Policy-training frequency and final-only extraction (experiments 3 and 4) change the supervised fitting budget and timing for the average-policy network, advantage-network reinitialisation (experiment 5) changes the regret-approximation optimisation path, the fair warm-start ablation (experiment 6) tests checkpoint/resume fidelity, the learning-rate schedule ablation (experiment 7) changes the optimiser trajectory while holding the Deep CFR data-generation protocol fixed, the constrained random search (experiment 8) screens multiple implementation and optimisation choices under a practical compute budget, the target-processing ablation (experiment 9) changes only the supervised advantage-network targets seen during fitting, the replay/averaging ablation (experiment 10) changes only average-policy target weighting by default, the network-size ablation (experiment 11) changes only the policy and advantage MLP architecture, and experiments 12-17 isolate residual connections, layer normalisation, policy-vs-advantage architecture roles, shared advantage trunks, factorised advantage heads, and dropout. In the thesis, report exploitability, head-to-head strength, supervised update budget, checkpoint fidelity, optimiser schedule, search-stage uncertainty, target-processing diagnostics, optional replay diagnostics, architecture-size diagnostics, and paired ablation differences as distinct quantities, and treat contrasts between them as empirical results rather than failure modes.

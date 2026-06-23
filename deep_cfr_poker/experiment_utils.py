@@ -92,7 +92,9 @@ def make_solver(game, config) -> DeepCFRSolver:
     batch_size_advantage, batch_size_strategy = resolve_solver_batch_sizes(config)
     return DeepCFRSolver(
         game,
+        policy_network_type=str(config.get("policy_network_type", "mlp")),
         policy_network_layers=tuple(config["policy_network_layers"]),
+        advantage_network_type=str(config.get("advantage_network_type", "mlp")),
         advantage_network_layers=tuple(config["advantage_network_layers"]),
         num_iterations=int(config["num_iterations"]),
         num_traversals=int(config["num_traversals"]),
@@ -575,6 +577,8 @@ def export_results(
         "average_strategy_weighting",
         "priority_alpha",
         "priority_epsilon",
+        "policy_network_type",
+        "advantage_network_type",
         "policy_training_mode",
         "reinitialize_advantage_networks",
         "seed",
@@ -641,6 +645,10 @@ def export_results(
                         ),
                         "priority_alpha": result.get("priority_alpha", ""),
                         "priority_epsilon": result.get("priority_epsilon", ""),
+                        "policy_network_type": result.get("policy_network_type", ""),
+                        "advantage_network_type": result.get(
+                            "advantage_network_type", ""
+                        ),
                         "policy_training_mode": result.get("policy_training_mode", ""),
                         "reinitialize_advantage_networks": (
                             bool(result["reinitialize_advantage_networks"])
