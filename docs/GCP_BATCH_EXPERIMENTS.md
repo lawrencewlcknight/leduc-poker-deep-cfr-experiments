@@ -287,12 +287,47 @@ python -m pip install --no-cache-dir --no-build-isolation -e .
 python -m pip install --no-cache-dir "google-cloud-storage>=2.16,<4.0"
 python -m pip check || true
 
+PYTHON_BIN="$(command -v python)"
+UPLOAD_DESTINATION="{bucket}/{job_name}/"
+UPLOAD_INTERVAL_SECONDS="${{UPLOAD_INTERVAL_SECONDS:-1800}}"
+
+upload_outputs() {{
+  if [ -d outputs ]; then
+    echo "Uploading outputs to Cloud Storage: $UPLOAD_DESTINATION"
+    "$PYTHON_BIN" scripts/upload_outputs_to_gcs.py outputs "$UPLOAD_DESTINATION" || true
+  else
+    echo "No outputs directory found yet; skipping upload."
+  fi
+}}
+
+periodic_upload_outputs() {{
+  while true; do
+    sleep "$UPLOAD_INTERVAL_SECONDS" || break
+    echo "Periodic output upload."
+    upload_outputs
+  done
+}}
+
+cleanup_uploads() {{
+  status=$?
+  if [ -n "${{UPLOAD_PID:-}}" ]; then
+    kill "$UPLOAD_PID" 2>/dev/null || true
+    wait "$UPLOAD_PID" 2>/dev/null || true
+  fi
+  echo "Final output upload before exit. Script status: $status"
+  upload_outputs
+  exit "$status"
+}}
+
+periodic_upload_outputs &
+UPLOAD_PID="$!"
+trap cleanup_uploads EXIT
+
 mkdir -p "outputs/cloud/{job_name}"
 
 {experiment_command}
 
-echo "Experiment completed. Copying outputs to Cloud Storage."
-python scripts/upload_outputs_to_gcs.py outputs "{bucket}/{job_name}/"
+echo "Experiment completed."
 
 deactivate
 
@@ -639,10 +674,12 @@ A VM may be too small if:
 | `21600` | 6 hours |
 | `43200` | 12 hours |
 | `86400` | 24 hours |
+| `259200` | 72 hours |
+| `345600` | 96 hours |
 
-If a job exceeds `MAX_RUN_SECONDS`, Batch stops the task and marks the job as failed. If the task is stopped before the final Python upload step, outputs that exist only on the VM may be lost.
+If a job exceeds `MAX_RUN_SECONDS`, Batch stops the task and marks the job as failed. The submission helper periodically uploads `outputs/` while the job is running, but the safety cap should still leave room for the final seed and final export.
 
-For full experiments, use a generous cap such as 12 or 24 hours unless you are deliberately testing runtime behaviour.
+For full Leduc architecture ablations, use a generous cap such as 96 hours unless you are deliberately testing runtime behaviour. Smaller smoke or Kuhn runs can use shorter limits.
 
 ---
 

@@ -753,6 +753,7 @@ def main_from_config(
 
     results = []
     failed = []
+    total_runs = len(seeds) * len(config["architecture_variants"])
     for variant in config["architecture_variants"]:
         variant_config = _variant_config(config, variant)
         logger.info(
@@ -777,6 +778,20 @@ def main_from_config(
                         config["exploitability_threshold"],
                     )
                 )
+                partial_info = export_ablation_results(
+                    results,
+                    run_dir,
+                    config,
+                    seeds,
+                    metadata_extra=metadata_extra,
+                    failed=failed or None,
+                )
+                logger.info(
+                    "Wrote partial export after %d/%d completed runs: %s",
+                    len(results),
+                    total_runs,
+                    partial_info["summary_csv"].resolve(),
+                )
             except Exception as exc:  # pragma: no cover
                 logger.exception(
                     "Seed %s failed for variant %s: %s",
@@ -792,6 +807,20 @@ def main_from_config(
                         "traceback": traceback.format_exc(),
                     }
                 )
+                if results:
+                    partial_info = export_ablation_results(
+                        results,
+                        run_dir,
+                        config,
+                        seeds,
+                        metadata_extra=metadata_extra,
+                        failed=failed,
+                    )
+                    logger.info(
+                        "Wrote partial export with %d failed run(s): %s",
+                        len(failed),
+                        partial_info["summary_csv"].resolve(),
+                    )
 
     if not results:
         logger.error("All runs failed; nothing to export.")
@@ -822,7 +851,7 @@ def main_from_config(
     logger.info(
         "Completed %d/%d runs",
         len(results),
-        len(seeds) * len(config["architecture_variants"]),
+        total_runs,
     )
     if failed:
         logger.warning("%d run(s) failed; see failed_seeds.json", len(failed))
