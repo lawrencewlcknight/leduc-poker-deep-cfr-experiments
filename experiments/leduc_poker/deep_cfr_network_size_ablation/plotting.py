@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from scipy import stats  # noqa: E402
 
+from deep_cfr_poker.plotting import set_chart_title
+
 
 def _results_for_variant(results: Sequence[dict], variant_id: str):
     return [r for r in results if str(r["variant_id"]) == str(variant_id)]
@@ -100,7 +102,7 @@ def _plot_architecture_heatmap(
     ax.set_yticklabels([str(depth) for depth in depths])
     ax.set_xlabel("Hidden-layer width")
     ax.set_ylabel("Number of hidden layers")
-    ax.set_title(title)
+    set_chart_title(ax, title)
     for i in range(len(depths)):
         for j in range(len(widths)):
             value = grid[i, j]
@@ -193,7 +195,7 @@ def plot_network_size_ablation(
             )
         ax.set_xlabel(x_key.replace("_", " ").title())
         ax.set_ylabel(ylabel)
-        ax.set_title(title)
+        set_chart_title(ax, title)
         ax.grid(True)
         ax.legend(ncol=2, fontsize=8)
         fig.tight_layout()
@@ -270,7 +272,7 @@ def plot_network_size_ablation(
         ax.set_xticks(np.arange(len(comparison_variants)))
         ax.set_xticklabels([labels.get(v, v) for v in comparison_variants], rotation=25, ha="right")
         ax.set_ylabel(f"Delta final exploitability vs {baseline_variant_id}")
-        ax.set_title("Paired Architecture Differences Across Seeds")
+        set_chart_title(ax, "Paired Architecture Differences Across Seeds")
         ax.grid(True, axis="y")
         fig.tight_layout()
         fig.savefig(run_dir / "paired_deltas_vs_baseline.png", dpi=200, bbox_inches="tight")
@@ -307,10 +309,9 @@ def plot_network_size_ablation(
             ax.fill_between(iterations, mean - se, mean + se, alpha=0.12, color=color)
         ax.set_xlabel("Training iteration")
         ax.set_ylabel(ylabel)
-        ax.set_title(title)
+        set_chart_title(ax, title)
         ax.grid(True)
         ax.legend(ncol=2, fontsize=8)
         fig.tight_layout()
         fig.savefig(run_dir / filename, dpi=200, bbox_inches="tight")
         plt.close(fig)
-

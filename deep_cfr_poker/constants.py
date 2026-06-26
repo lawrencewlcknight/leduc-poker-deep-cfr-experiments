@@ -1,5 +1,6 @@
 """Shared constants for poker experiments."""
 
+DEFAULT_ALGORITHM_VARIANT = "Deep CFR"
 LEDUC_GAME_VALUE_PLAYER_0 = -0.085606424078
 KNOWN_GAME_VALUES_PLAYER_0 = {
     "leduc_poker": LEDUC_GAME_VALUE_PLAYER_0,

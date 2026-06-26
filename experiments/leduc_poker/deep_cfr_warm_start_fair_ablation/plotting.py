@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from scipy import stats  # noqa: E402
 
+from deep_cfr_poker.plotting import set_chart_title
+
 
 def _results_for_arm(results: Sequence[dict], arm: str):
     return [r for r in results if str(r["arm"]) == str(arm)]
@@ -122,7 +124,7 @@ def plot_warm_start_fair_ablation(
             )
         ax.set_xlabel(x_key.replace("_", " ").title())
         ax.set_ylabel(ylabel)
-        ax.set_title(title)
+        set_chart_title(ax, title)
         ax.grid(True, alpha=0.3)
         ax.legend()
         fig.tight_layout()
@@ -156,7 +158,7 @@ def plot_warm_start_fair_ablation(
         )
         ax.set_xlabel("Training iteration")
         ax.set_ylabel("Warm-start exploitability - baseline exploitability")
-        ax.set_title("Paired Exploitability Difference Over Training")
+        set_chart_title(ax, "Paired Exploitability Difference Over Training")
         ax.grid(True, alpha=0.3)
         ax.legend()
         fig.tight_layout()
@@ -184,7 +186,7 @@ def plot_warm_start_fair_ablation(
         ax.set_xticklabels(labels)
         ax.axhline(0.0, linestyle="--", linewidth=1)
         ax.set_ylabel("Warm-start - baseline")
-        ax.set_title("Mean Paired Warm-Start Difference")
+        set_chart_title(ax, "Mean Paired Warm-Start Difference")
         ax.grid(True, axis="y", alpha=0.3)
         fig.tight_layout()
         fig.savefig(run_dir / "paired_difference_summary_bar_chart.png", dpi=200, bbox_inches="tight")

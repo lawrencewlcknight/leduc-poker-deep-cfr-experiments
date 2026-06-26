@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from scipy import stats  # noqa: E402
 
+from deep_cfr_poker.plotting import set_chart_title
+
 
 def _results_for_variant(results: Sequence[dict], variant_id: str):
     return [r for r in results if str(r["variant_id"]) == str(variant_id)]
@@ -95,7 +97,7 @@ def plot_advantage_reinitialisation_ablation(
     ax.axhline(0.0, linestyle="--", color="black", linewidth=1, label="Nash equilibrium target")
     ax.set_xlabel("Training iteration")
     ax.set_ylabel("Exploitability (NashConv/2)")
-    ax.set_title("Advantage-Network Reinitialisation Ablation")
+    set_chart_title(ax, "Advantage-Network Reinitialisation Ablation")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -112,7 +114,7 @@ def plot_advantage_reinitialisation_ablation(
     ax.axhline(0.0, linestyle="--", color="black", linewidth=1, label="Nash equilibrium target")
     ax.set_xlabel("Nodes touched")
     ax.set_ylabel("Exploitability (NashConv/2)")
-    ax.set_title("Sample Efficiency by Reinitialisation Setting")
+    set_chart_title(ax, "Sample Efficiency by Reinitialisation Setting")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -154,7 +156,7 @@ def plot_advantage_reinitialisation_ablation(
     )
     ax.set_xlabel("Training iteration")
     ax.set_ylabel("Average policy value for player 0")
-    ax.set_title("Average Policy Value by Reinitialisation Setting")
+    set_chart_title(ax, "Average Policy Value by Reinitialisation Setting")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -177,7 +179,7 @@ def plot_advantage_reinitialisation_ablation(
     )
     ax.set_xlabel("Nodes touched")
     ax.set_ylabel("Average policy value for player 0")
-    ax.set_title("Average Policy Value by Nodes Touched")
+    set_chart_title(ax, "Average Policy Value by Nodes Touched")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -191,7 +193,7 @@ def plot_advantage_reinitialisation_ablation(
         ax.fill_between(iterations, mean - se, mean + se, alpha=0.18, color=colours.get(variant_id))
     ax.set_xlabel("Training iteration")
     ax.set_ylabel(r"$|v(\sigma) - v^*|$")
-    ax.set_title("Policy-Value Error by Reinitialisation Setting")
+    set_chart_title(ax, "Policy-Value Error by Reinitialisation Setting")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -228,7 +230,7 @@ def plot_advantage_reinitialisation_ablation(
         else:
             ax.axhline(0.0, linestyle="--", label="Nash equilibrium target")
         ax.set_ylabel(metric)
-        ax.set_title(title)
+        set_chart_title(ax, title)
         ax.grid(True, axis="y")
         ax.legend()
         fig.tight_layout()
@@ -249,7 +251,7 @@ def plot_advantage_reinitialisation_ablation(
             ax.fill_between(iterations, mean - se, mean + se, alpha=0.18, color=colours.get(variant_id))
         ax.set_xlabel("Training iteration")
         ax.set_ylabel(ylabel)
-        ax.set_title(title)
+        set_chart_title(ax, title)
         ax.grid(True)
         ax.legend()
         fig.tight_layout()
@@ -278,7 +280,7 @@ def plot_advantage_reinitialisation_ablation(
         ax.set_xticklabels([str(seed) for seed in kept_seeds])
         ax.set_xlabel("Seed")
         ax.set_ylabel("Final exploitability difference\n(True - False)")
-        ax.set_title("Paired Difference in Final Exploitability")
+        set_chart_title(ax, "Paired Difference in Final Exploitability")
         ax.grid(True, axis="y")
         fig.tight_layout()
         fig.savefig(run_dir / "paired_final_exploitability_delta_true_minus_false.png", dpi=200, bbox_inches="tight")

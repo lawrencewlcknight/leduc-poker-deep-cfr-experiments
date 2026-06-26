@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from scipy import stats  # noqa: E402
 
+from deep_cfr_poker.plotting import set_chart_title
+
 
 def _results_for_variant(results: Sequence[dict], variant_id: str):
     return [r for r in results if str(r["variant_id"]) == str(variant_id)]
@@ -80,7 +82,7 @@ def plot_final_only_policy_training_ablation(
     ax.axhline(0.0, linestyle="--", label="Nash equilibrium target")
     ax.set_xlabel("Training iteration")
     ax.set_ylabel("Exploitability (NashConv/2)")
-    ax.set_title("Average-Policy Training Timing: Exploitability")
+    set_chart_title(ax, "Average-Policy Training Timing: Exploitability")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -97,7 +99,7 @@ def plot_final_only_policy_training_ablation(
     ax.axhline(0.0, linestyle="--", label="Nash equilibrium target")
     ax.set_xlabel("Nodes touched")
     ax.set_ylabel("Exploitability (NashConv/2)")
-    ax.set_title("Average-Policy Training Timing by Nodes Touched")
+    set_chart_title(ax, "Average-Policy Training Timing by Nodes Touched")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -118,7 +120,7 @@ def plot_final_only_policy_training_ablation(
     )
     ax.set_xlabel("Training iteration")
     ax.set_ylabel("Average policy value for player 0")
-    ax.set_title("Average-Policy Training Timing: Average Policy Value")
+    set_chart_title(ax, "Average-Policy Training Timing: Average Policy Value")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -139,7 +141,7 @@ def plot_final_only_policy_training_ablation(
     )
     ax.set_xlabel("Nodes touched")
     ax.set_ylabel("Average policy value for player 0")
-    ax.set_title("Average-Policy Training Timing by Nodes Touched")
+    set_chart_title(ax, "Average-Policy Training Timing by Nodes Touched")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -153,7 +155,7 @@ def plot_final_only_policy_training_ablation(
         ax.fill_between(iterations, mean - se, mean + se, alpha=0.15)
     ax.set_xlabel("Training iteration")
     ax.set_ylabel(r"$|v(\sigma) - v^*|$")
-    ax.set_title("Average-Policy Training Timing: Policy-Value Error")
+    set_chart_title(ax, "Average-Policy Training Timing: Policy-Value Error")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -194,7 +196,7 @@ def plot_final_only_policy_training_ablation(
     ax.axhline(0.0, linestyle="--", label="Nash equilibrium target")
     ax.set_xlabel("Average-policy training regime")
     ax.set_ylabel("Final exploitability")
-    ax.set_title("Final Exploitability by Training Regime")
+    set_chart_title(ax, "Final Exploitability by Training Regime")
     ax.grid(True, axis="y")
     ax.legend()
     fig.tight_layout()
@@ -212,7 +214,7 @@ def plot_final_only_policy_training_ablation(
     )
     ax.set_xlabel("Average-policy training regime")
     ax.set_ylabel("Final average policy value for player 0")
-    ax.set_title("Final Average Policy Value by Training Regime")
+    set_chart_title(ax, "Final Average Policy Value by Training Regime")
     ax.grid(True, axis="y")
     ax.legend()
     fig.tight_layout()
@@ -225,7 +227,7 @@ def plot_final_only_policy_training_ablation(
     ax.set_xticklabels(labels)
     ax.set_xlabel("Average-policy training regime")
     ax.set_ylabel(r"Final $|v(\sigma) - v^*|$")
-    ax.set_title("Final Policy-Value Error by Training Regime")
+    set_chart_title(ax, "Final Policy-Value Error by Training Regime")
     ax.grid(True, axis="y")
     fig.tight_layout()
     fig.savefig(run_dir / "final_policy_value_error_by_regime.png", dpi=200, bbox_inches="tight")
@@ -245,7 +247,7 @@ def plot_final_only_policy_training_ablation(
                 ax.fill_between(iterations, mean - se, mean + se, alpha=0.15)
         ax.set_xlabel("Training iteration")
         ax.set_ylabel(ylabel)
-        ax.set_title(title)
+        set_chart_title(ax, title)
         ax.grid(True)
         ax.legend()
         fig.tight_layout()
@@ -284,7 +286,7 @@ def plot_final_only_policy_training_ablation(
         ax.set_xticklabels(labels)
         ax.axhline(0.0, color="black", linewidth=1)
         ax.set_ylabel("Delta final exploitability vs intermittent baseline")
-        ax.set_title("Paired Final-Exploitability Differences")
+        set_chart_title(ax, "Paired Final-Exploitability Differences")
         ax.grid(True, axis="y")
         fig.tight_layout()
         fig.savefig(run_dir / "paired_final_exploitability_delta_vs_reference.png", dpi=200, bbox_inches="tight")

@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from scipy import stats  # noqa: E402
 
+from deep_cfr_poker.plotting import set_chart_title
+
 
 def _results_for_variant(results: Sequence[dict], variant_id: str):
     return [r for r in results if str(r["variant_id"]) == str(variant_id)]
@@ -123,7 +125,7 @@ def plot_replay_averaging_ablation(
             )
         ax.set_xlabel(x_key.replace("_", " ").title())
         ax.set_ylabel(ylabel)
-        ax.set_title(title)
+        set_chart_title(ax, title)
         ax.grid(True)
         ax.legend()
         fig.tight_layout()
@@ -145,7 +147,7 @@ def plot_replay_averaging_ablation(
     ax.set_xticklabels([labels[v] for v in variant_ids], rotation=25, ha="right")
     ax.axhline(0.0, linestyle="--", label="Nash equilibrium target")
     ax.set_ylabel("Mean final exploitability")
-    ax.set_title("Final Exploitability by Replay/Averaging Variant")
+    set_chart_title(ax, "Final Exploitability by Replay/Averaging Variant")
     ax.grid(True, axis="y")
     ax.legend()
     fig.tight_layout()
@@ -170,7 +172,7 @@ def plot_replay_averaging_ablation(
         label="Player 0 Nash value",
     )
     ax.set_ylabel("Mean final average policy value for player 0")
-    ax.set_title("Final Average Policy Value by Replay/Averaging Variant")
+    set_chart_title(ax, "Final Average Policy Value by Replay/Averaging Variant")
     ax.grid(True, axis="y")
     ax.legend()
     fig.tight_layout()
@@ -202,7 +204,7 @@ def plot_replay_averaging_ablation(
         ax.set_xticks(np.arange(len(comparison_variants)))
         ax.set_xticklabels([labels.get(v, v) for v in comparison_variants], rotation=25, ha="right")
         ax.set_ylabel(f"Delta final exploitability vs {baseline_variant_id}")
-        ax.set_title("Paired Replay/Averaging Differences Across Seeds")
+        set_chart_title(ax, "Paired Replay/Averaging Differences Across Seeds")
         ax.grid(True, axis="y")
         fig.tight_layout()
         fig.savefig(run_dir / "paired_deltas_vs_baseline.png", dpi=200, bbox_inches="tight")
@@ -243,7 +245,7 @@ def plot_replay_averaging_ablation(
             ax.fill_between(iterations, mean - se, mean + se, alpha=0.15)
         ax.set_xlabel("Training iteration")
         ax.set_ylabel(ylabel)
-        ax.set_title(title)
+        set_chart_title(ax, title)
         ax.grid(True)
         ax.legend()
         fig.tight_layout()

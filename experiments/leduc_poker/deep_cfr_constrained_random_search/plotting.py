@@ -15,6 +15,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from scipy import stats  # noqa: E402
 
+from deep_cfr_poker.plotting import set_chart_title
+
 
 def _mean_se(values):
     arr = np.asarray(values, dtype=np.float64)
@@ -46,7 +48,7 @@ def _barh_final_exploitability(rows, run_dir: Path, filename: str, title: str, t
     ax.barh(labels, means, xerr=ses, capsize=3, alpha=0.85)
     ax.axvline(0.0, linestyle="--", label="Nash equilibrium target")
     ax.set_xlabel("Mean final exploitability")
-    ax.set_title(title)
+    set_chart_title(ax, title)
     ax.grid(True, axis="x")
     ax.legend()
     fig.tight_layout()
@@ -81,7 +83,7 @@ def _barh_final_average_policy_value(
     ax.barh(labels, means, xerr=ses, capsize=3, alpha=0.85)
     ax.axvline(target, linestyle="--", label="Player 0 Nash value")
     ax.set_xlabel("Mean final average policy value for player 0")
-    ax.set_title(title)
+    set_chart_title(ax, title)
     ax.grid(True, axis="x")
     ax.legend()
     fig.tight_layout()
@@ -141,7 +143,7 @@ def _plot_curve(
         ax.axhline(threshold, linestyle="--", label=threshold_label)
     ax.set_xlabel(x_key.replace("_", " ").title())
     ax.set_ylabel(ylabel)
-    ax.set_title(title)
+    set_chart_title(ax, title)
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -284,7 +286,7 @@ def plot_random_search(
             ax.barh(labels, means, xerr=ses, capsize=3, alpha=0.85)
             ax.axvline(0.0, color="black", linewidth=1)
             ax.set_xlabel("Final exploitability difference vs baseline")
-            ax.set_title("Paired Difference Relative to Experiment 2 Baseline")
+            set_chart_title(ax, "Paired Difference Relative to Experiment 2 Baseline")
             ax.grid(True, axis="x")
             fig.tight_layout()
             path = run_dir / "confirmation_paired_difference_vs_baseline.png"

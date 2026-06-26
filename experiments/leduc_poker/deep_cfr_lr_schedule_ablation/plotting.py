@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from scipy import stats  # noqa: E402
 
+from deep_cfr_poker.plotting import set_chart_title
+
 
 def _results_for_schedule(results: Sequence[dict], schedule: str):
     return [r for r in results if str(r["schedule"]) == str(schedule)]
@@ -74,7 +76,7 @@ def plot_lr_schedule_ablation(
         ax.plot(first["iterations"], first["learning_rate"], label=labels[schedule])
     ax.set_xlabel("Training iteration")
     ax.set_ylabel("Learning rate")
-    ax.set_title("Learning-Rate Schedules")
+    set_chart_title(ax, "Learning-Rate Schedules")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -135,7 +137,7 @@ def plot_lr_schedule_ablation(
             )
         ax.set_xlabel(x_key.replace("_", " ").title())
         ax.set_ylabel(ylabel)
-        ax.set_title(title)
+        set_chart_title(ax, title)
         ax.grid(True)
         ax.legend()
         fig.tight_layout()
@@ -158,7 +160,7 @@ def plot_lr_schedule_ablation(
     ax.axhline(0.0, linestyle="--", label="Nash equilibrium target")
     ax.set_xlabel("Learning-rate schedule")
     ax.set_ylabel("Mean final exploitability")
-    ax.set_title("Final Exploitability by Learning-Rate Schedule")
+    set_chart_title(ax, "Final Exploitability by Learning-Rate Schedule")
     ax.grid(True, axis="y")
     ax.legend()
     fig.tight_layout()
@@ -184,7 +186,7 @@ def plot_lr_schedule_ablation(
     )
     ax.set_xlabel("Learning-rate schedule")
     ax.set_ylabel("Mean final average policy value for player 0")
-    ax.set_title("Final Average Policy Value by Learning-Rate Schedule")
+    set_chart_title(ax, "Final Average Policy Value by Learning-Rate Schedule")
     ax.grid(True, axis="y")
     ax.legend()
     fig.tight_layout()
@@ -214,7 +216,7 @@ def plot_lr_schedule_ablation(
         ax.set_xticklabels([labels.get(s, s) for s in comparison_schedules], rotation=20, ha="right")
         ax.set_xlabel("Schedule")
         ax.set_ylabel(f"Delta final exploitability vs {baseline_schedule}")
-        ax.set_title("Paired Change vs Constant Baseline")
+        set_chart_title(ax, "Paired Change vs Constant Baseline")
         ax.grid(True, axis="y")
         fig.tight_layout()
         fig.savefig(run_dir / "delta_final_exploitability_vs_baseline.png", dpi=200, bbox_inches="tight")
@@ -234,7 +236,7 @@ def plot_lr_schedule_ablation(
             ax.fill_between(iterations, mean - se, mean + se, alpha=0.15)
         ax.set_xlabel("Training iteration")
         ax.set_ylabel(ylabel)
-        ax.set_title(title)
+        set_chart_title(ax, title)
         ax.grid(True)
         ax.legend()
         fig.tight_layout()

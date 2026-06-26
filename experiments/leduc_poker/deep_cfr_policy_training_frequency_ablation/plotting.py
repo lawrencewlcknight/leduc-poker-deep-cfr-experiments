@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from scipy import stats  # noqa: E402
 
+from deep_cfr_poker.plotting import set_chart_title
+
 
 def _results_for_variant(results: Sequence[dict], variant: int):
     return [
@@ -74,7 +76,7 @@ def plot_policy_training_frequency_ablation(
     ax.axhline(0.0, linestyle="--", label="Nash equilibrium target")
     ax.set_xlabel("Training iteration")
     ax.set_ylabel("Exploitability (NashConv/2)")
-    ax.set_title("Policy-Training-Frequency Ablation")
+    set_chart_title(ax, "Policy-Training-Frequency Ablation")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -91,7 +93,7 @@ def plot_policy_training_frequency_ablation(
     ax.axhline(0.0, linestyle="--", label="Nash equilibrium target")
     ax.set_xlabel("Nodes touched")
     ax.set_ylabel("Exploitability (NashConv/2)")
-    ax.set_title("Policy-Training-Frequency Ablation by Nodes")
+    set_chart_title(ax, "Policy-Training-Frequency Ablation by Nodes")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -111,7 +113,7 @@ def plot_policy_training_frequency_ablation(
     )
     ax.set_xlabel("Training iteration")
     ax.set_ylabel("Average policy value for player 0")
-    ax.set_title("Average Policy Value by Policy-Training Frequency")
+    set_chart_title(ax, "Average Policy Value by Policy-Training Frequency")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -132,7 +134,7 @@ def plot_policy_training_frequency_ablation(
     )
     ax.set_xlabel("Nodes touched")
     ax.set_ylabel("Average policy value for player 0")
-    ax.set_title("Average Policy Value by Nodes Touched")
+    set_chart_title(ax, "Average Policy Value by Nodes Touched")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -147,7 +149,7 @@ def plot_policy_training_frequency_ablation(
         ax.fill_between(iterations, mean - se, mean + se, alpha=0.15)
     ax.set_xlabel("Training iteration")
     ax.set_ylabel(r"$|v(\sigma) - v^*|$")
-    ax.set_title("Policy-Value Error by Policy-Training Frequency")
+    set_chart_title(ax, "Policy-Value Error by Policy-Training Frequency")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -179,7 +181,7 @@ def plot_policy_training_frequency_ablation(
     ax.axhline(0.0, linestyle="--", label="Nash equilibrium target")
     ax.set_xlabel("CFR iterations between policy-network training events")
     ax.set_ylabel("Final exploitability")
-    ax.set_title("Final Exploitability by Policy-Training Frequency")
+    set_chart_title(ax, "Final Exploitability by Policy-Training Frequency")
     ax.grid(True, axis="y")
     ax.legend()
     fig.tight_layout()
@@ -197,7 +199,7 @@ def plot_policy_training_frequency_ablation(
     )
     ax.set_xlabel("CFR iterations between policy-network training events")
     ax.set_ylabel("Final average policy value for player 0")
-    ax.set_title("Final Average Policy Value by Policy-Training Frequency")
+    set_chart_title(ax, "Final Average Policy Value by Policy-Training Frequency")
     ax.grid(True, axis="y")
     ax.legend()
     fig.tight_layout()
@@ -226,7 +228,7 @@ def plot_policy_training_frequency_ablation(
     ax.axhline(0.0, linestyle="--", label="Nash equilibrium target")
     ax.set_xlabel("CFR iterations between policy-network training events")
     ax.set_ylabel("Exploitability summary; lower is better")
-    ax.set_title("Stability and Overall Exploitability")
+    set_chart_title(ax, "Stability and Overall Exploitability")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -245,7 +247,7 @@ def plot_policy_training_frequency_ablation(
             ax.plot(iterations, mean, linewidth=2, label=f"train every {variant}")
         ax.set_xlabel("Training iteration")
         ax.set_ylabel(ylabel)
-        ax.set_title(title)
+        set_chart_title(ax, title)
         ax.grid(True)
         ax.legend()
         fig.tight_layout()
@@ -284,7 +286,7 @@ def plot_policy_training_frequency_ablation(
         ax.axhline(0.0, color="black", linewidth=1)
         ax.set_xlabel("Comparison policy-training frequency")
         ax.set_ylabel(f"Delta final exploitability vs {reference_variant}")
-        ax.set_title("Paired Final-Exploitability Differences")
+        set_chart_title(ax, "Paired Final-Exploitability Differences")
         ax.grid(True, axis="y")
         fig.tight_layout()
         fig.savefig(run_dir / "paired_final_exploitability_delta_vs_reference.png", dpi=200, bbox_inches="tight")

@@ -20,9 +20,64 @@ import numpy as np  # noqa: E402
 from scipy import stats  # noqa: E402
 
 from .constants import (
+    DEFAULT_ALGORITHM_VARIANT,
     DEFAULT_AVERAGE_POLICY_VALUE_TARGET,
     DEFAULT_EXPLOITABILITY_THRESHOLD,
+    DEFAULT_GAME_NAME,
 )
+
+
+_POKER_VARIANT_LABELS = {
+    "kuhn_poker": "Kuhn",
+    "leduc_poker": "Leduc",
+}
+
+
+def poker_variant_label(*, game_name: str = DEFAULT_GAME_NAME, poker_variant: str = None) -> str:
+    """Returns the human-readable poker variant label used in figure titles."""
+    if poker_variant:
+        return str(poker_variant).strip()
+    game_name = str(game_name or DEFAULT_GAME_NAME).strip()
+    if game_name in _POKER_VARIANT_LABELS:
+        return _POKER_VARIANT_LABELS[game_name]
+    label = game_name.removesuffix("_poker").replace("_", " ").strip()
+    return label.title() if label else "Poker"
+
+
+def format_chart_title(
+    title: str,
+    *,
+    algorithm_variant: str = DEFAULT_ALGORITHM_VARIANT,
+    game_name: str = DEFAULT_GAME_NAME,
+    poker_variant: str = None,
+) -> str:
+    """Formats a chart title as ``Algorithm - Poker Variant - Description``."""
+    algorithm = str(algorithm_variant or DEFAULT_ALGORITHM_VARIANT).strip()
+    poker = poker_variant_label(game_name=game_name, poker_variant=poker_variant)
+    prefix = f"{algorithm} - {poker} - "
+    title = str(title).strip()
+    if title.startswith(prefix):
+        return title
+    return f"{prefix}{title}"
+
+
+def set_chart_title(
+    ax,
+    title: str,
+    *,
+    algorithm_variant: str = DEFAULT_ALGORITHM_VARIANT,
+    game_name: str = DEFAULT_GAME_NAME,
+    poker_variant: str = None,
+) -> None:
+    """Applies the repository-wide figure-title naming convention."""
+    ax.set_title(
+        format_chart_title(
+            title,
+            algorithm_variant=algorithm_variant,
+            game_name=game_name,
+            poker_variant=poker_variant,
+        )
+    )
 
 
 def _pad_to_length(arr: np.ndarray, length: int) -> np.ndarray:
@@ -114,7 +169,7 @@ def plot_multiseed_results(
     ax.axhline(0.0, linestyle="--", label="Nash equilibrium target")
     ax.set_xlabel("Training iteration")
     ax.set_ylabel("Exploitability (NashConv/2)")
-    ax.set_title("Leduc Poker Deep CFR: Exploitability Across Seeds")
+    set_chart_title(ax, "Exploitability Across Seeds")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -145,7 +200,7 @@ def plot_multiseed_results(
     ax.axhline(0.0, linestyle="--", label="Nash equilibrium target")
     ax.set_xlabel("Nodes touched")
     ax.set_ylabel("Exploitability (NashConv/2)")
-    ax.set_title("Leduc Poker Deep CFR: Exploitability by Nodes Touched")
+    set_chart_title(ax, "Exploitability by Nodes Touched")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -178,7 +233,7 @@ def plot_multiseed_results(
     )
     ax.set_xlabel("Training iteration")
     ax.set_ylabel("Average policy value for player 0")
-    ax.set_title("Leduc Poker Deep CFR: Average Policy Value Across Seeds")
+    set_chart_title(ax, "Average Policy Value Across Seeds")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -213,7 +268,7 @@ def plot_multiseed_results(
     )
     ax.set_xlabel("Nodes touched")
     ax.set_ylabel("Average policy value for player 0")
-    ax.set_title("Leduc Poker Deep CFR: Average Policy Value by Nodes Touched")
+    set_chart_title(ax, "Average Policy Value by Nodes Touched")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -243,7 +298,7 @@ def plot_multiseed_results(
     )
     ax.set_xlabel("Training iteration")
     ax.set_ylabel(r"$|v(\sigma) - v^*|$")
-    ax.set_title("Leduc Poker Deep CFR: Policy-Value Error")
+    set_chart_title(ax, "Policy-Value Error")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -293,7 +348,7 @@ def plot_diagnostics(
     )
     ax.set_xlabel("Training iteration")
     ax.set_ylabel("MSE loss")
-    ax.set_title("Average-Policy Network Loss Diagnostic")
+    set_chart_title(ax, "Average-Policy Network Loss Diagnostic")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -304,7 +359,7 @@ def plot_diagnostics(
     ax.plot(iterations, np.nanmean(adv_target_var_mat, axis=0), linewidth=2)
     ax.set_xlabel("Training iteration")
     ax.set_ylabel("Advantage target variance")
-    ax.set_title("Advantage-Target Variance Diagnostic")
+    set_chart_title(ax, "Advantage-Target Variance Diagnostic")
     ax.grid(True)
     fig.tight_layout()
     fig.savefig(
@@ -329,7 +384,7 @@ def plot_diagnostics(
     )
     ax.set_xlabel("Training iteration")
     ax.set_ylabel("Diagnostic value")
-    ax.set_title("Policy Distribution Diagnostics")
+    set_chart_title(ax, "Policy Distribution Diagnostics")
     ax.grid(True)
     ax.legend()
     fig.tight_layout()
@@ -384,7 +439,7 @@ def plot_pairwise_heatmap(
     ax.set_yticklabels(list(row_labels))
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    ax.set_title(title)
+    set_chart_title(ax, title)
     plt.setp(
         ax.get_xticklabels(),
         rotation=45,
@@ -439,7 +494,7 @@ def plot_strength_curve_with_errorbars(
         )
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    ax.set_title(title)
+    set_chart_title(ax, title)
     ax.grid(True, alpha=0.3)
     if reference_line_label:
         ax.legend()
@@ -481,7 +536,7 @@ def plot_scatter_annotated(
         )
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    ax.set_title(title)
+    set_chart_title(ax, title)
     ax.grid(True, alpha=0.3)
     if x_reference_line_label:
         ax.legend()
