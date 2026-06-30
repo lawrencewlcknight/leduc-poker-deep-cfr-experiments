@@ -21,6 +21,7 @@ from deep_cfr_poker.networks import build_network, build_shared_trunk_player_hea
         "layer_norm_mlp",
         "residual_layer_norm_mlp",
         "centered_advantage_mlp",
+        "residual_layer_norm_centered_advantage_mlp",
         "dueling_mlp",
     ],
 )
@@ -39,7 +40,20 @@ def test_network_variants_forward_and_reset(network_type):
     assert y_after_reset.shape == (4, 3)
 
 
-@pytest.mark.parametrize("network_type", ["centered_advantage_mlp", "dueling_mlp"])
+ZERO_MEAN_ADVANTAGE_HEADS = {
+    "centered_advantage_mlp",
+    "residual_layer_norm_centered_advantage_mlp",
+}
+
+
+@pytest.mark.parametrize(
+    "network_type",
+    [
+        "centered_advantage_mlp",
+        "residual_layer_norm_centered_advantage_mlp",
+        "dueling_mlp",
+    ],
+)
 def test_factorised_advantage_heads_center_action_terms(network_type):
     net = build_network(
         network_type,
@@ -51,7 +65,7 @@ def test_factorised_advantage_heads_center_action_terms(network_type):
     y = net(x)
     centred = y - y.mean(dim=-1, keepdim=True)
 
-    if network_type == "centered_advantage_mlp":
+    if network_type in ZERO_MEAN_ADVANTAGE_HEADS:
         assert torch.allclose(y.mean(dim=-1), torch.zeros(4), atol=1e-6)
     else:
         assert centred.shape == (4, 3)

@@ -257,6 +257,44 @@ class CenteredAdvantageMLP(nn.Module):
         self.action_head.reset()
 
 
+class ResidualLayerNormCenteredAdvantageMLP(nn.Module):
+    """Residual LayerNorm trunk with centred action-advantage outputs."""
+
+    def __init__(
+        self,
+        input_size: int,
+        hidden_sizes: Sequence[int],
+        output_size: int,
+        activate_final: bool = False,
+    ) -> None:
+        super().__init__()
+        del activate_final
+        self.hidden_layers = nn.ModuleList()
+        in_size = int(input_size)
+        for size in hidden_sizes:
+            size = int(size)
+            self.hidden_layers.append(
+                ResidualHiddenLayer(in_size=in_size, out_size=size, layer_norm=True)
+            )
+            in_size = size
+        self.action_head = SonnetLinear(
+            in_size=in_size,
+            out_size=int(output_size),
+            activate_relu=False,
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        for layer in self.hidden_layers:
+            x = layer(x)
+        raw_advantages = self.action_head(x)
+        return raw_advantages - raw_advantages.mean(dim=-1, keepdim=True)
+
+    def reset(self) -> None:
+        for layer in self.hidden_layers:
+            layer.reset()
+        self.action_head.reset()
+
+
 class DuelingMLP(nn.Module):
     """MLP with a scalar state head plus centred action-advantage head."""
 
@@ -414,6 +452,13 @@ def build_network(
             output_size,
             activate_final,
         )
+    if network_type == "residual_layer_norm_centered_advantage_mlp":
+        return ResidualLayerNormCenteredAdvantageMLP(
+            input_size,
+            hidden_sizes,
+            output_size,
+            activate_final,
+        )
     if network_type == "dueling_mlp":
         return DuelingMLP(
             input_size,
@@ -430,6 +475,7 @@ def build_network(
         "residual_mlp",
         "residual_layer_norm_mlp",
         "centered_advantage_mlp",
+        "residual_layer_norm_centered_advantage_mlp",
         "dueling_mlp",
     )
     raise ValueError(f"Unknown network_type={network_type!r}. Expected one of {valid}.")

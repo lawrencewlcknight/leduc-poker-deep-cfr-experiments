@@ -25,6 +25,9 @@ from experiments.leduc_poker.deep_cfr_dropout_ablation.config import (
 from experiments.leduc_poker.deep_cfr_factorised_advantage_head_ablation.config import (
     ARCHITECTURE_VARIANTS as FACTORISED_HEAD_VARIANTS,
 )
+from experiments.leduc_poker.deep_cfr_composite_architecture_validation.config import (
+    ARCHITECTURE_VARIANTS as COMPOSITE_ARCHITECTURE_VARIANTS,
+)
 from experiments.leduc_poker.deep_cfr_network_role_ablation.config import (
     ARCHITECTURE_VARIANTS as ROLE_VARIANTS,
 )
@@ -89,6 +92,11 @@ BASE_SMOKE_CONFIG = {
             "factorised_head",
             FACTORISED_HEAD_VARIANTS[:3],
             "direct_advantage_layers2_width32",
+        ),
+        (
+            "composite_architecture",
+            COMPOSITE_ARCHITECTURE_VARIANTS,
+            "baseline_direct_2x32",
         ),
         (
             "dropout",
