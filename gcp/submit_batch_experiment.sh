@@ -109,6 +109,21 @@ python -m pip check || true
 PYTHON_BIN="$(command -v python)"
 UPLOAD_DESTINATION="{bucket}/{job_name}/"
 UPLOAD_INTERVAL_SECONDS="${{UPLOAD_INTERVAL_SECONDS:-1800}}"
+UPLOAD_SLEEP_STEP_SECONDS="${{UPLOAD_SLEEP_STEP_SECONDS:-1}}"
+
+case "$UPLOAD_INTERVAL_SECONDS" in
+  ''|*[!0-9]*)
+    echo "Invalid UPLOAD_INTERVAL_SECONDS=$UPLOAD_INTERVAL_SECONDS; using 1800."
+    UPLOAD_INTERVAL_SECONDS=1800
+    ;;
+esac
+
+case "$UPLOAD_SLEEP_STEP_SECONDS" in
+  ''|*[!0-9]*|0)
+    echo "Invalid UPLOAD_SLEEP_STEP_SECONDS=$UPLOAD_SLEEP_STEP_SECONDS; using 1."
+    UPLOAD_SLEEP_STEP_SECONDS=1
+    ;;
+esac
 
 upload_outputs() {{
   if [ -d outputs ]; then
@@ -120,8 +135,25 @@ upload_outputs() {{
 }}
 
 periodic_upload_outputs() {{
+  set +x
+  if [ "$UPLOAD_INTERVAL_SECONDS" -le 0 ]; then
+    return 0
+  fi
+
+  local elapsed=0
+  local sleep_step="$UPLOAD_SLEEP_STEP_SECONDS"
+  if [ "$sleep_step" -gt "$UPLOAD_INTERVAL_SECONDS" ]; then
+    sleep_step="$UPLOAD_INTERVAL_SECONDS"
+  fi
+
   while true; do
-    sleep "$UPLOAD_INTERVAL_SECONDS" || break
+    sleep "$sleep_step" || break
+    elapsed=$((elapsed + sleep_step))
+    if [ "$elapsed" -lt "$UPLOAD_INTERVAL_SECONDS" ]; then
+      continue
+    fi
+
+    elapsed=0
     echo "Periodic output upload."
     upload_outputs
   done
@@ -138,8 +170,12 @@ cleanup_uploads() {{
   exit "$status"
 }}
 
-periodic_upload_outputs &
-UPLOAD_PID="$!"
+if [ "$UPLOAD_INTERVAL_SECONDS" -gt 0 ]; then
+  periodic_upload_outputs &
+  UPLOAD_PID="$!"
+else
+  echo "Periodic output uploads disabled."
+fi
 trap cleanup_uploads EXIT
 
 mkdir -p "outputs/cloud/{job_name}"
