@@ -102,15 +102,15 @@ The repository is organised so that each experiment can be run independently whi
 │       │   ├── config.py
 │       │   ├── run.py
 │       │   └── README.md
-│       ├── deep_cfr_composite_architecture_validation/ # Composite follow-up
+│       ├── deep_cfr_composite_architecture_validation/ # Experiment 18
 │       │   ├── config.py
 │       │   ├── run.py
 │       │   └── README.md
-│       ├── deep_cfr_composite_target_processing_ablation/ # Composite follow-up
+│       ├── deep_cfr_composite_target_processing_ablation/ # Experiment 19
 │       │   ├── config.py
 │       │   ├── run.py
 │       │   └── README.md
-│       └── deep_cfr_composite_standardized_replay_averaging_ablation/ # Composite follow-up
+│       └── deep_cfr_composite_standardized_replay_averaging_ablation/ # Experiment 20
 │           ├── config.py
 │           ├── run.py
 │           └── README.md
@@ -268,7 +268,7 @@ Runs a negative/control-style regularisation test. The average-policy network is
 
 **Question:** does dropout regularisation improve advantage fitting and final average-policy quality, or does it mainly add noise to an already stochastic Deep CFR training signal?
 
-### Composite architecture validation
+### 18. Leduc poker Deep CFR composite architecture validation
 
 [`experiments/leduc_poker/deep_cfr_composite_architecture_validation/`](experiments/leduc_poker/deep_cfr_composite_architecture_validation/README.md)
 
@@ -276,7 +276,7 @@ Tests the proposed architecture that combines the strongest architecture-ablatio
 
 **Question:** do the architectural interventions that looked promising in isolation remain complementary when combined into a single candidate baseline?
 
-### Composite target-processing ablation
+### 19. Leduc poker Deep CFR composite target-processing ablation
 
 [`experiments/leduc_poker/deep_cfr_composite_target_processing_ablation/`](experiments/leduc_poker/deep_cfr_composite_target_processing_ablation/README.md)
 
@@ -284,7 +284,7 @@ Mirrors the target-processing ablation on the composite architecture baseline. R
 
 **Question:** does advantage-target standardisation still improve Deep CFR after the network architecture has already been strengthened?
 
-### Composite standardised replay and average-strategy weighting ablation
+### 20. Leduc poker Deep CFR composite standardised replay and average-strategy weighting ablation
 
 [`experiments/leduc_poker/deep_cfr_composite_standardized_replay_averaging_ablation/`](experiments/leduc_poker/deep_cfr_composite_standardized_replay_averaging_ablation/README.md)
 
@@ -597,10 +597,10 @@ python -m experiments.leduc_poker.deep_cfr_dropout_ablation.run \
   --memory-capacity 256 \
   --output-root outputs/smoke_tests
 
-# Composite follow-up — architecture validation
+# Experiment 18 — composite architecture validation
 python -m experiments.leduc_poker.deep_cfr_composite_architecture_validation.run
 
-# Composite follow-up — architecture validation quick smoke test
+# Experiment 18 — quick smoke test
 python -m experiments.leduc_poker.deep_cfr_composite_architecture_validation.run \
   --seeds 1234 \
   --iterations 3 \
@@ -615,10 +615,10 @@ python -m experiments.leduc_poker.deep_cfr_composite_architecture_validation.run
   --memory-capacity 256 \
   --output-root outputs/smoke_tests
 
-# Composite follow-up — target-processing ablation
+# Experiment 19 — composite target-processing ablation
 python -m experiments.leduc_poker.deep_cfr_composite_target_processing_ablation.run
 
-# Composite follow-up — target-processing quick smoke test
+# Experiment 19 — quick smoke test
 python -m experiments.leduc_poker.deep_cfr_composite_target_processing_ablation.run \
   --seeds 1234 \
   --iterations 3 \
@@ -635,10 +635,10 @@ python -m experiments.leduc_poker.deep_cfr_composite_target_processing_ablation.
   --memory-capacity 256 \
   --output-root outputs/smoke_tests
 
-# Composite follow-up — standardised replay and averaging ablation
+# Experiment 20 — composite standardised replay and averaging ablation
 python -m experiments.leduc_poker.deep_cfr_composite_standardized_replay_averaging_ablation.run
 
-# Composite follow-up — standardised replay and averaging quick smoke test
+# Experiment 20 — quick smoke test
 python -m experiments.leduc_poker.deep_cfr_composite_standardized_replay_averaging_ablation.run \
   --seeds 1234 \
   --iterations 3 \
@@ -682,4 +682,4 @@ is documented in [`docs/THESIS_ARTIFACTS.md`](docs/THESIS_ARTIFACTS.md).
 
 ## Academic interpretation
 
-Exploitability is the primary equilibrium-quality metric. Policy-value error and neural-network losses are useful diagnostics, but they should not be interpreted as evidence of Nash-equilibrium convergence on their own. Head-to-head expected value (experiment 2) is a separate, complementary signal: a low-exploitability checkpoint may still lose to specific earlier checkpoints in direct play. Policy-training frequency and final-only extraction (experiments 3 and 4) change the supervised fitting budget and timing for the average-policy network, advantage-network reinitialisation (experiment 5) changes the regret-approximation optimisation path, the fair warm-start ablation (experiment 6) tests checkpoint/resume fidelity, the learning-rate schedule ablation (experiment 7) changes the optimiser trajectory while holding the Deep CFR data-generation protocol fixed, the constrained random search (experiment 8) screens multiple implementation and optimisation choices under a practical compute budget, the target-processing ablation (experiment 9) changes only the supervised advantage-network targets seen during fitting, the replay/averaging ablation (experiment 10) changes only average-policy target weighting by default, the network-size ablation (experiment 11) changes only the policy and advantage MLP architecture, and experiments 12-17 isolate residual connections, layer normalisation, policy-vs-advantage architecture roles, shared advantage trunks, factorised advantage heads, and dropout. The composite follow-up experiments test whether the strongest architecture signals combine into a better candidate baseline, then re-test target processing and average-strategy weighting on that improved baseline rather than assuming effects transfer unchanged from the original configuration. In the thesis, report exploitability, head-to-head strength, supervised update budget, checkpoint fidelity, optimiser schedule, search-stage uncertainty, target-processing diagnostics, optional replay diagnostics, architecture-size diagnostics, and paired ablation differences as distinct quantities, and treat contrasts between them as empirical results rather than failure modes.
+Exploitability is the primary equilibrium-quality metric. Policy-value error and neural-network losses are useful diagnostics, but they should not be interpreted as evidence of Nash-equilibrium convergence on their own. Head-to-head expected value (experiment 2) is a separate, complementary signal: a low-exploitability checkpoint may still lose to specific earlier checkpoints in direct play. Policy-training frequency and final-only extraction (experiments 3 and 4) change the supervised fitting budget and timing for the average-policy network, advantage-network reinitialisation (experiment 5) changes the regret-approximation optimisation path, the fair warm-start ablation (experiment 6) tests checkpoint/resume fidelity, the learning-rate schedule ablation (experiment 7) changes the optimiser trajectory while holding the Deep CFR data-generation protocol fixed, the constrained random search (experiment 8) screens multiple implementation and optimisation choices under a practical compute budget, the target-processing ablation (experiment 9) changes only the supervised advantage-network targets seen during fitting, the replay/averaging ablation (experiment 10) changes only average-policy target weighting by default, the network-size ablation (experiment 11) changes only the policy and advantage MLP architecture, and experiments 12-17 isolate residual connections, layer normalisation, policy-vs-advantage architecture roles, shared advantage trunks, factorised advantage heads, and dropout. Experiments 18-20 test whether the strongest architecture signals combine into a better candidate baseline, then re-test target processing and average-strategy weighting on that improved baseline rather than assuming effects transfer unchanged from the original configuration. In the thesis, report exploitability, head-to-head strength, supervised update budget, checkpoint fidelity, optimiser schedule, search-stage uncertainty, target-processing diagnostics, optional replay diagnostics, architecture-size diagnostics, and paired ablation differences as distinct quantities, and treat contrasts between them as empirical results rather than failure modes.
