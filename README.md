@@ -110,7 +110,23 @@ The repository is organised so that each experiment can be run independently whi
 │       │   ├── config.py
 │       │   ├── run.py
 │       │   └── README.md
-│       └── deep_cfr_composite_standardized_replay_averaging_ablation/ # Experiment 20
+│       ├── deep_cfr_composite_standardized_replay_averaging_ablation/ # Experiment 20
+│       │   ├── config.py
+│       │   ├── run.py
+│       │   └── README.md
+│       ├── deep_cfr_composite_policy_extraction_ablation/ # Experiment 21
+│       │   ├── config.py
+│       │   ├── run.py
+│       │   └── README.md
+│       ├── deep_cfr_composite_advantage_fitting_ablation/ # Experiment 22
+│       │   ├── config.py
+│       │   ├── run.py
+│       │   └── README.md
+│       ├── deep_cfr_composite_replay_memory_ablation/ # Experiment 23
+│       │   ├── config.py
+│       │   ├── run.py
+│       │   └── README.md
+│       └── deep_cfr_composite_learning_rate_ablation/ # Experiment 24
 │           ├── config.py
 │           ├── run.py
 │           └── README.md
@@ -291,6 +307,38 @@ Mirrors the target-processing ablation on the composite architecture baseline. R
 Repeats the replay and average-strategy weighting ablation on the current best candidate baseline: composite advantage architecture plus standardised advantage targets. The thesis-facing default contrasts linear CFR-style average-strategy weighting against uniform weighting over five matched seeds; priority-replay variants remain available as optional exploratory arms.
 
 **Question:** after architecture and target processing have been improved, is there additional gain from changing the average-policy target weighting?
+
+### 21. Leduc poker Deep CFR composite policy-extraction HP ablation
+
+[`experiments/leduc_poker/deep_cfr_composite_policy_extraction_ablation/`](experiments/leduc_poker/deep_cfr_composite_policy_extraction_ablation/README.md)
+
+Starts from the current best candidate baseline from experiment 20 and varies only average-policy extraction settings: policy-training cadence, policy-gradient steps, and strategy minibatch size.
+
+**Question:** is the best baseline still limited by how accurately or how often the average-policy network is fitted to the sampled average-strategy targets?
+
+### 22. Leduc poker Deep CFR composite advantage-fitting HP ablation
+
+[`experiments/leduc_poker/deep_cfr_composite_advantage_fitting_ablation/`](experiments/leduc_poker/deep_cfr_composite_advantage_fitting_ablation/README.md)
+
+Starts from the current best candidate baseline and varies only advantage-network fitting effort: supervised gradient steps and advantage minibatch size, including one high-effort combined arm.
+
+**Question:** do the deeper residual LayerNorm advantage networks benefit from more settled supervised regret fitting, or is the 200-step, 1024-batch baseline already sufficient?
+
+### 23. Leduc poker Deep CFR composite replay-memory HP ablation
+
+[`experiments/leduc_poker/deep_cfr_composite_replay_memory_ablation/`](experiments/leduc_poker/deep_cfr_composite_replay_memory_ablation/README.md)
+
+Starts from the current best candidate baseline and varies only replay reservoir capacity, testing `1M`, `2M`, and `5M` against the `10M` baseline.
+
+**Question:** does a stronger Deep CFR baseline prefer fresher replay samples, or does it still need the broader historical coverage of the large reservoir?
+
+### 24. Leduc poker Deep CFR composite learning-rate HP ablation
+
+[`experiments/leduc_poker/deep_cfr_composite_learning_rate_ablation/`](experiments/leduc_poker/deep_cfr_composite_learning_rate_ablation/README.md)
+
+Starts from the current best candidate baseline and varies only constant learning-rate magnitude. This deliberately differs from experiment 7, which tested learning-rate schedules on the older baseline.
+
+**Question:** is the improved baseline sensitive to a modest constant learning-rate change, despite the earlier negative result for scheduled decay?
 
 ## Setup
 
@@ -654,6 +702,86 @@ python -m experiments.leduc_poker.deep_cfr_composite_standardized_replay_averagi
   --batch-size-strategy 2 \
   --memory-capacity 256 \
   --output-root outputs/smoke_tests
+
+# Experiment 21 — composite policy-extraction HP ablation
+python -m experiments.leduc_poker.deep_cfr_composite_policy_extraction_ablation.run
+
+# Experiment 21 — quick smoke test
+python -m experiments.leduc_poker.deep_cfr_composite_policy_extraction_ablation.run \
+  --seeds 1234 \
+  --iterations 3 \
+  --traversals 4 \
+  --evaluation-interval 1 \
+  --policy-network-train-every 1 \
+  --variant-ids composite_best_baseline,policy_train_every_10 \
+  --policy-network-train-steps 1 \
+  --advantage-network-train-steps 1 \
+  --policy-network-layers 8,8 \
+  --advantage-network-layers 8,8 \
+  --batch-size-advantage 2 \
+  --batch-size-strategy 2 \
+  --memory-capacity 256 \
+  --output-root outputs/smoke_tests
+
+# Experiment 22 — composite advantage-fitting HP ablation
+python -m experiments.leduc_poker.deep_cfr_composite_advantage_fitting_ablation.run
+
+# Experiment 22 — quick smoke test
+python -m experiments.leduc_poker.deep_cfr_composite_advantage_fitting_ablation.run \
+  --seeds 1234 \
+  --iterations 3 \
+  --traversals 4 \
+  --evaluation-interval 1 \
+  --policy-network-train-every 1 \
+  --variant-ids composite_best_baseline,advantage_batch_512 \
+  --policy-network-train-steps 1 \
+  --advantage-network-train-steps 1 \
+  --policy-network-layers 8,8 \
+  --advantage-network-layers 8,8 \
+  --batch-size-advantage 2 \
+  --batch-size-strategy 2 \
+  --memory-capacity 256 \
+  --output-root outputs/smoke_tests
+
+# Experiment 23 — composite replay-memory HP ablation
+python -m experiments.leduc_poker.deep_cfr_composite_replay_memory_ablation.run
+
+# Experiment 23 — quick smoke test
+python -m experiments.leduc_poker.deep_cfr_composite_replay_memory_ablation.run \
+  --seeds 1234 \
+  --iterations 3 \
+  --traversals 4 \
+  --evaluation-interval 1 \
+  --policy-network-train-every 1 \
+  --variant-ids composite_best_baseline,memory_capacity_1m \
+  --policy-network-train-steps 1 \
+  --advantage-network-train-steps 1 \
+  --policy-network-layers 8,8 \
+  --advantage-network-layers 8,8 \
+  --batch-size-advantage 2 \
+  --batch-size-strategy 2 \
+  --memory-capacity 256 \
+  --output-root outputs/smoke_tests
+
+# Experiment 24 — composite learning-rate HP ablation
+python -m experiments.leduc_poker.deep_cfr_composite_learning_rate_ablation.run
+
+# Experiment 24 — quick smoke test
+python -m experiments.leduc_poker.deep_cfr_composite_learning_rate_ablation.run \
+  --seeds 1234 \
+  --iterations 3 \
+  --traversals 4 \
+  --evaluation-interval 1 \
+  --policy-network-train-every 1 \
+  --variant-ids composite_best_baseline,learning_rate_0_002 \
+  --policy-network-train-steps 1 \
+  --advantage-network-train-steps 1 \
+  --policy-network-layers 8,8 \
+  --advantage-network-layers 8,8 \
+  --batch-size-advantage 2 \
+  --batch-size-strategy 2 \
+  --memory-capacity 256 \
+  --output-root outputs/smoke_tests
 ```
 
 Each CLI exposes overrides for the most commonly varied configuration values. See `--help` for the per-experiment flag list, and the experiment's own README for the full output catalogue.
@@ -682,4 +810,4 @@ is documented in [`docs/THESIS_ARTIFACTS.md`](docs/THESIS_ARTIFACTS.md).
 
 ## Academic interpretation
 
-Exploitability is the primary equilibrium-quality metric. Policy-value error and neural-network losses are useful diagnostics, but they should not be interpreted as evidence of Nash-equilibrium convergence on their own. Head-to-head expected value (experiment 2) is a separate, complementary signal: a low-exploitability checkpoint may still lose to specific earlier checkpoints in direct play. Policy-training frequency and final-only extraction (experiments 3 and 4) change the supervised fitting budget and timing for the average-policy network, advantage-network reinitialisation (experiment 5) changes the regret-approximation optimisation path, the fair warm-start ablation (experiment 6) tests checkpoint/resume fidelity, the learning-rate schedule ablation (experiment 7) changes the optimiser trajectory while holding the Deep CFR data-generation protocol fixed, the constrained random search (experiment 8) screens multiple implementation and optimisation choices under a practical compute budget, the target-processing ablation (experiment 9) changes only the supervised advantage-network targets seen during fitting, the replay/averaging ablation (experiment 10) changes only average-policy target weighting by default, the network-size ablation (experiment 11) changes only the policy and advantage MLP architecture, and experiments 12-17 isolate residual connections, layer normalisation, policy-vs-advantage architecture roles, shared advantage trunks, factorised advantage heads, and dropout. Experiments 18-20 test whether the strongest architecture signals combine into a better candidate baseline, then re-test target processing and average-strategy weighting on that improved baseline rather than assuming effects transfer unchanged from the original configuration. In the thesis, report exploitability, head-to-head strength, supervised update budget, checkpoint fidelity, optimiser schedule, search-stage uncertainty, target-processing diagnostics, optional replay diagnostics, architecture-size diagnostics, and paired ablation differences as distinct quantities, and treat contrasts between them as empirical results rather than failure modes.
+Exploitability is the primary equilibrium-quality metric. Policy-value error and neural-network losses are useful diagnostics, but they should not be interpreted as evidence of Nash-equilibrium convergence on their own. Head-to-head expected value (experiment 2) is a separate, complementary signal: a low-exploitability checkpoint may still lose to specific earlier checkpoints in direct play. Policy-training frequency and final-only extraction (experiments 3 and 4) change the supervised fitting budget and timing for the average-policy network, advantage-network reinitialisation (experiment 5) changes the regret-approximation optimisation path, the fair warm-start ablation (experiment 6) tests checkpoint/resume fidelity, the learning-rate schedule ablation (experiment 7) changes the optimiser trajectory while holding the Deep CFR data-generation protocol fixed, the constrained random search (experiment 8) screens multiple implementation and optimisation choices under a practical compute budget, the target-processing ablation (experiment 9) changes only the supervised advantage-network targets seen during fitting, the replay/averaging ablation (experiment 10) changes only average-policy target weighting by default, the network-size ablation (experiment 11) changes only the policy and advantage MLP architecture, and experiments 12-17 isolate residual connections, layer normalisation, policy-vs-advantage architecture roles, shared advantage trunks, factorised advantage heads, and dropout. Experiments 18-20 test whether the strongest architecture signals combine into a better candidate baseline, then re-test target processing and average-strategy weighting on that improved baseline rather than assuming effects transfer unchanged from the original configuration. Experiments 21-24 run targeted hyperparameter searches around that best baseline, isolating policy extraction, advantage fitting, replay freshness, and constant learning-rate magnitude. In the thesis, report exploitability, head-to-head strength, supervised update budget, checkpoint fidelity, optimiser schedule, search-stage uncertainty, target-processing diagnostics, optional replay diagnostics, architecture-size diagnostics, and paired ablation differences as distinct quantities, and treat contrasts between them as empirical results rather than failure modes.
