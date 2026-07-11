@@ -39,6 +39,35 @@ python -m experiments.leduc_poker.deep_cfr_composite_policy_extraction_ablation.
   --output-root outputs/smoke_tests
 ```
 
+GCP Batch smoke test:
+
+Set `PROJECT_ID`, `REGION`, `BUCKET`, and `SA_EMAIL` first; see
+[`docs/GCP_BATCH_EXPERIMENTS.md`](../../../docs/GCP_BATCH_EXPERIMENTS.md).
+
+```bash
+./gcp/submit_batch_experiment.sh \
+  "smoke-exp21-policy-extraction-$(date +%Y%m%d-%H%M%S)" \
+  "python -m experiments.leduc_poker.deep_cfr_composite_policy_extraction_ablation.run \
+    --seeds 1234 \
+    --iterations 3 \
+    --traversals 4 \
+    --evaluation-interval 1 \
+    --policy-network-train-every 1 \
+    --variant-ids composite_best_baseline,policy_train_every_10 \
+    --policy-network-train-steps 1 \
+    --advantage-network-train-steps 1 \
+    --policy-network-layers 8,8 \
+    --advantage-network-layers 8,8 \
+    --batch-size-advantage 2 \
+    --batch-size-strategy 2 \
+    --memory-capacity 256 \
+    --output-root outputs/cloud/smoke-exp21-policy-extraction" \
+  "n2-standard-4" \
+  "3600" \
+  "4000" \
+  "16000"
+```
+
 ## Outputs
 
 The runner writes the standard experiment artefacts: `seed_summary.csv`,

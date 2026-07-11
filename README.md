@@ -703,10 +703,14 @@ python -m experiments.leduc_poker.deep_cfr_composite_standardized_replay_averagi
   --memory-capacity 256 \
   --output-root outputs/smoke_tests
 
+# Experiments 21-24 — GCP Batch smoke tests use the wrapper below.
+# Before submitting, set PROJECT_ID, REGION, BUCKET, and SA_EMAIL as described
+# in docs/GCP_BATCH_EXPERIMENTS.md.
+
 # Experiment 21 — composite policy-extraction HP ablation
 python -m experiments.leduc_poker.deep_cfr_composite_policy_extraction_ablation.run
 
-# Experiment 21 — quick smoke test
+# Experiment 21 — local quick smoke test
 python -m experiments.leduc_poker.deep_cfr_composite_policy_extraction_ablation.run \
   --seeds 1234 \
   --iterations 3 \
@@ -723,10 +727,33 @@ python -m experiments.leduc_poker.deep_cfr_composite_policy_extraction_ablation.
   --memory-capacity 256 \
   --output-root outputs/smoke_tests
 
+# Experiment 21 — GCP Batch quick smoke test
+./gcp/submit_batch_experiment.sh \
+  "smoke-exp21-policy-extraction-$(date +%Y%m%d-%H%M%S)" \
+  "python -m experiments.leduc_poker.deep_cfr_composite_policy_extraction_ablation.run \
+    --seeds 1234 \
+    --iterations 3 \
+    --traversals 4 \
+    --evaluation-interval 1 \
+    --policy-network-train-every 1 \
+    --variant-ids composite_best_baseline,policy_train_every_10 \
+    --policy-network-train-steps 1 \
+    --advantage-network-train-steps 1 \
+    --policy-network-layers 8,8 \
+    --advantage-network-layers 8,8 \
+    --batch-size-advantage 2 \
+    --batch-size-strategy 2 \
+    --memory-capacity 256 \
+    --output-root outputs/cloud/smoke-exp21-policy-extraction" \
+  "n2-standard-4" \
+  "3600" \
+  "4000" \
+  "16000"
+
 # Experiment 22 — composite advantage-fitting HP ablation
 python -m experiments.leduc_poker.deep_cfr_composite_advantage_fitting_ablation.run
 
-# Experiment 22 — quick smoke test
+# Experiment 22 — local quick smoke test
 python -m experiments.leduc_poker.deep_cfr_composite_advantage_fitting_ablation.run \
   --seeds 1234 \
   --iterations 3 \
@@ -743,10 +770,33 @@ python -m experiments.leduc_poker.deep_cfr_composite_advantage_fitting_ablation.
   --memory-capacity 256 \
   --output-root outputs/smoke_tests
 
+# Experiment 22 — GCP Batch quick smoke test
+./gcp/submit_batch_experiment.sh \
+  "smoke-exp22-advantage-fitting-$(date +%Y%m%d-%H%M%S)" \
+  "python -m experiments.leduc_poker.deep_cfr_composite_advantage_fitting_ablation.run \
+    --seeds 1234 \
+    --iterations 3 \
+    --traversals 4 \
+    --evaluation-interval 1 \
+    --policy-network-train-every 1 \
+    --variant-ids composite_best_baseline,advantage_batch_512 \
+    --policy-network-train-steps 1 \
+    --advantage-network-train-steps 1 \
+    --policy-network-layers 8,8 \
+    --advantage-network-layers 8,8 \
+    --batch-size-advantage 2 \
+    --batch-size-strategy 2 \
+    --memory-capacity 256 \
+    --output-root outputs/cloud/smoke-exp22-advantage-fitting" \
+  "n2-standard-4" \
+  "3600" \
+  "4000" \
+  "16000"
+
 # Experiment 23 — composite replay-memory HP ablation
 python -m experiments.leduc_poker.deep_cfr_composite_replay_memory_ablation.run
 
-# Experiment 23 — quick smoke test
+# Experiment 23 — local quick smoke test
 python -m experiments.leduc_poker.deep_cfr_composite_replay_memory_ablation.run \
   --seeds 1234 \
   --iterations 3 \
@@ -763,10 +813,33 @@ python -m experiments.leduc_poker.deep_cfr_composite_replay_memory_ablation.run 
   --memory-capacity 256 \
   --output-root outputs/smoke_tests
 
+# Experiment 23 — GCP Batch quick smoke test
+./gcp/submit_batch_experiment.sh \
+  "smoke-exp23-replay-memory-$(date +%Y%m%d-%H%M%S)" \
+  "python -m experiments.leduc_poker.deep_cfr_composite_replay_memory_ablation.run \
+    --seeds 1234 \
+    --iterations 3 \
+    --traversals 4 \
+    --evaluation-interval 1 \
+    --policy-network-train-every 1 \
+    --variant-ids composite_best_baseline,memory_capacity_1m \
+    --policy-network-train-steps 1 \
+    --advantage-network-train-steps 1 \
+    --policy-network-layers 8,8 \
+    --advantage-network-layers 8,8 \
+    --batch-size-advantage 2 \
+    --batch-size-strategy 2 \
+    --memory-capacity 256 \
+    --output-root outputs/cloud/smoke-exp23-replay-memory" \
+  "n2-standard-4" \
+  "3600" \
+  "4000" \
+  "16000"
+
 # Experiment 24 — composite learning-rate HP ablation
 python -m experiments.leduc_poker.deep_cfr_composite_learning_rate_ablation.run
 
-# Experiment 24 — quick smoke test
+# Experiment 24 — local quick smoke test
 python -m experiments.leduc_poker.deep_cfr_composite_learning_rate_ablation.run \
   --seeds 1234 \
   --iterations 3 \
@@ -782,6 +855,29 @@ python -m experiments.leduc_poker.deep_cfr_composite_learning_rate_ablation.run 
   --batch-size-strategy 2 \
   --memory-capacity 256 \
   --output-root outputs/smoke_tests
+
+# Experiment 24 — GCP Batch quick smoke test
+./gcp/submit_batch_experiment.sh \
+  "smoke-exp24-learning-rate-$(date +%Y%m%d-%H%M%S)" \
+  "python -m experiments.leduc_poker.deep_cfr_composite_learning_rate_ablation.run \
+    --seeds 1234 \
+    --iterations 3 \
+    --traversals 4 \
+    --evaluation-interval 1 \
+    --policy-network-train-every 1 \
+    --variant-ids composite_best_baseline,learning_rate_0_002 \
+    --policy-network-train-steps 1 \
+    --advantage-network-train-steps 1 \
+    --policy-network-layers 8,8 \
+    --advantage-network-layers 8,8 \
+    --batch-size-advantage 2 \
+    --batch-size-strategy 2 \
+    --memory-capacity 256 \
+    --output-root outputs/cloud/smoke-exp24-learning-rate" \
+  "n2-standard-4" \
+  "3600" \
+  "4000" \
+  "16000"
 ```
 
 Each CLI exposes overrides for the most commonly varied configuration values. See `--help` for the per-experiment flag list, and the experiment's own README for the full output catalogue.
