@@ -15,6 +15,7 @@ from deep_cfr_poker.experiment_utils import run_single_seed
 from experiments.leduc_poker.deep_cfr_composite_advantage_fitting_ablation.config import (
     ADVANTAGE_FITTING_VARIANTS,
     DEFAULT_CONFIG as ADVANTAGE_FITTING_CONFIG,
+    DEFAULT_SEEDS as ADVANTAGE_FITTING_SEEDS,
 )
 from experiments.leduc_poker.deep_cfr_composite_advantage_fitting_ablation.run import (
     build_config as build_advantage_fitting_config,
@@ -27,6 +28,7 @@ from experiments.leduc_poker.deep_cfr_composite_hp_ablation_common import (
 )
 from experiments.leduc_poker.deep_cfr_composite_learning_rate_ablation.config import (
     DEFAULT_CONFIG as LEARNING_RATE_CONFIG,
+    DEFAULT_SEEDS as LEARNING_RATE_SEEDS,
     LEARNING_RATE_VARIANTS,
 )
 from experiments.leduc_poker.deep_cfr_composite_learning_rate_ablation.run import (
@@ -34,6 +36,7 @@ from experiments.leduc_poker.deep_cfr_composite_learning_rate_ablation.run impor
 )
 from experiments.leduc_poker.deep_cfr_composite_policy_extraction_ablation.config import (
     DEFAULT_CONFIG as POLICY_EXTRACTION_CONFIG,
+    DEFAULT_SEEDS as POLICY_EXTRACTION_SEEDS,
     POLICY_EXTRACTION_VARIANTS,
 )
 from experiments.leduc_poker.deep_cfr_composite_policy_extraction_ablation.run import (
@@ -41,6 +44,7 @@ from experiments.leduc_poker.deep_cfr_composite_policy_extraction_ablation.run i
 )
 from experiments.leduc_poker.deep_cfr_composite_replay_memory_ablation.config import (
     DEFAULT_CONFIG as REPLAY_MEMORY_CONFIG,
+    DEFAULT_SEEDS as REPLAY_MEMORY_SEEDS,
     REPLAY_MEMORY_VARIANTS,
 )
 from experiments.leduc_poker.deep_cfr_composite_replay_memory_ablation.run import (
@@ -128,6 +132,13 @@ def test_composite_hp_ablation_default_variant_sets():
         assert [variant["variant_id"] for variant in config["ablation_variants"]] == (
             expected_ids
         )
+
+
+def test_composite_hp_ablation_default_seed_sets():
+    assert POLICY_EXTRACTION_SEEDS == [1234, 2025, 31415]
+    assert ADVANTAGE_FITTING_SEEDS == [1234, 2025, 31415]
+    assert LEARNING_RATE_SEEDS == [1234, 2025, 31415]
+    assert REPLAY_MEMORY_SEEDS == [1234, 2025, 31415, 27182, 16180]
 
 
 SMOKE_CASES = (

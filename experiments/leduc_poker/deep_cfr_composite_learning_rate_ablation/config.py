@@ -4,11 +4,11 @@ from experiments.leduc_poker.deep_cfr_composite_hp_ablation_common import (
     BASELINE_VARIANT,
     BASELINE_VARIANT_ID,
     BASE_COMPOSITE_HP_CONFIG,
-    DEFAULT_SEEDS,
-    DEFAULT_SEEDS_5,
-    EXTENDED_SEEDS_10,
     make_variant,
 )
+
+
+DEFAULT_SEEDS = [1234, 2025, 31415]
 
 
 LEARNING_RATE_VARIANTS = (

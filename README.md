@@ -312,7 +312,7 @@ Repeats the replay and average-strategy weighting ablation on the current best c
 
 [`experiments/leduc_poker/deep_cfr_composite_policy_extraction_ablation/`](experiments/leduc_poker/deep_cfr_composite_policy_extraction_ablation/README.md)
 
-Starts from the current best candidate baseline from experiment 20 and varies only average-policy extraction settings: policy-training cadence, policy-gradient steps, and strategy minibatch size.
+Starts from the current best candidate baseline from experiment 20 and varies only average-policy extraction settings: policy-training cadence, policy-gradient steps, and strategy minibatch size. The default run uses three matched seeds to keep the targeted screening job inside the Batch runtime budget.
 
 **Question:** is the best baseline still limited by how accurately or how often the average-policy network is fitted to the sampled average-strategy targets?
 
@@ -320,7 +320,7 @@ Starts from the current best candidate baseline from experiment 20 and varies on
 
 [`experiments/leduc_poker/deep_cfr_composite_advantage_fitting_ablation/`](experiments/leduc_poker/deep_cfr_composite_advantage_fitting_ablation/README.md)
 
-Starts from the current best candidate baseline and varies only advantage-network fitting effort: supervised gradient steps and advantage minibatch size, including one high-effort combined arm.
+Starts from the current best candidate baseline and varies only advantage-network fitting effort: supervised gradient steps and advantage minibatch size, including one high-effort combined arm. The default run uses three matched seeds because this is the most computationally exposed of the targeted HP ablations.
 
 **Question:** do the deeper residual LayerNorm advantage networks benefit from more settled supervised regret fitting, or is the 200-step, 1024-batch baseline already sufficient?
 
@@ -336,7 +336,7 @@ Starts from the current best candidate baseline and varies only replay reservoir
 
 [`experiments/leduc_poker/deep_cfr_composite_learning_rate_ablation/`](experiments/leduc_poker/deep_cfr_composite_learning_rate_ablation/README.md)
 
-Starts from the current best candidate baseline and varies only constant learning-rate magnitude. This deliberately differs from experiment 7, which tested learning-rate schedules on the older baseline.
+Starts from the current best candidate baseline and varies only constant learning-rate magnitude. This deliberately differs from experiment 7, which tested learning-rate schedules on the older baseline. The default run uses three matched seeds for screening before any higher-seed confirmation run.
 
 **Question:** is the improved baseline sensitive to a modest constant learning-rate change, despite the earlier negative result for scheduled decay?
 

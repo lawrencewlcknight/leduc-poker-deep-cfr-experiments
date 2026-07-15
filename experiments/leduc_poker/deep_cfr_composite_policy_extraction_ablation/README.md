@@ -15,6 +15,8 @@ It then varies only the average-policy extraction settings.
 
 ## Run
 
+The default run uses three matched seeds: `1234,2025,31415`.
+
 ```bash
 python -m experiments.leduc_poker.deep_cfr_composite_policy_extraction_ablation.run
 ```

@@ -17,6 +17,8 @@ average-strategy weighting have improved.
 
 ## Run
 
+The default run uses three matched seeds: `1234,2025,31415`.
+
 ```bash
 python -m experiments.leduc_poker.deep_cfr_composite_learning_rate_ablation.run
 ```
