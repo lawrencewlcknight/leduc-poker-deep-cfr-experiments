@@ -6,6 +6,7 @@ import csv
 import gc
 import json
 import logging
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable, List, Mapping, Optional, Sequence
@@ -90,55 +91,76 @@ def make_solver(game, config) -> DeepCFRSolver:
         config.get("policy_network_train_every", config["evaluation_interval"])
     )
     batch_size_advantage, batch_size_strategy = resolve_solver_batch_sizes(config)
-    return DeepCFRSolver(
-        game,
-        policy_network_type=str(config.get("policy_network_type", "mlp")),
-        policy_network_layers=tuple(config["policy_network_layers"]),
-        advantage_network_type=str(config.get("advantage_network_type", "mlp")),
-        advantage_network_layers=tuple(config["advantage_network_layers"]),
-        num_iterations=int(config["num_iterations"]),
-        num_traversals=int(config["num_traversals"]),
-        learning_rate=float(config["learning_rate"]),
-        learning_rate_schedule=str(config.get("learning_rate_schedule", "constant")),
-        learning_rate_end=(
+    solver_kwargs = {
+        "policy_network_type": str(config.get("policy_network_type", "mlp")),
+        "policy_network_layers": tuple(config["policy_network_layers"]),
+        "advantage_network_type": str(config.get("advantage_network_type", "mlp")),
+        "advantage_network_layers": tuple(config["advantage_network_layers"]),
+        "num_iterations": int(config["num_iterations"]),
+        "num_traversals": int(config["num_traversals"]),
+        "learning_rate": float(config["learning_rate"]),
+        "learning_rate_schedule": str(config.get("learning_rate_schedule", "constant")),
+        "learning_rate_end": (
             float(config["learning_rate_end"])
             if config.get("learning_rate_end") is not None
             else None
         ),
-        learning_rate_decay_rate=float(config.get("learning_rate_decay_rate", 0.5)),
-        learning_rate_decay_steps=(
+        "learning_rate_decay_rate": float(config.get("learning_rate_decay_rate", 0.5)),
+        "learning_rate_decay_steps": (
             int(config["learning_rate_decay_steps"])
             if config.get("learning_rate_decay_steps") is not None
             else None
         ),
-        learning_rate_warmup_iterations=int(
+        "learning_rate_warmup_iterations": int(
             config.get("learning_rate_warmup_iterations", 0)
         ),
-        batch_size_advantage=batch_size_advantage,
-        batch_size_strategy=batch_size_strategy,
-        memory_capacity=int(config["memory_capacity"]),
-        reinitialize_advantage_networks=bool(config["reinitialize_advantage_networks"]),
-        policy_network_train_steps=int(config["policy_network_train_steps"]),
-        advantage_network_train_steps=int(config["advantage_network_train_steps"]),
-        compute_exploitability=bool(config["compute_exploitability"]),
-        target_processing=str(config.get("target_processing", "none")),
-        target_clip_value=float(config.get("target_clip_value", 1.0)),
-        target_standardize_epsilon=float(
+        "batch_size_advantage": batch_size_advantage,
+        "batch_size_strategy": batch_size_strategy,
+        "memory_capacity": int(config["memory_capacity"]),
+        "reinitialize_advantage_networks": bool(
+            config["reinitialize_advantage_networks"]
+        ),
+        "policy_network_train_steps": int(config["policy_network_train_steps"]),
+        "advantage_network_train_steps": int(config["advantage_network_train_steps"]),
+        "compute_exploitability": bool(config["compute_exploitability"]),
+        "target_processing": str(config.get("target_processing", "none")),
+        "target_clip_value": float(config.get("target_clip_value", 1.0)),
+        "target_standardize_epsilon": float(
             config.get("target_standardize_epsilon", 1e-6)
         ),
-        advantage_replay_sampling=str(config.get("advantage_replay_sampling", "uniform")),
-        average_strategy_weighting=str(config.get("average_strategy_weighting", "linear")),
-        priority_alpha=float(config.get("priority_alpha", 1.0)),
-        priority_epsilon=float(config.get("priority_epsilon", 1e-6)),
-        policy_network_train_every=policy_network_train_every,
-        evaluation_interval=int(config["evaluation_interval"]),
-        policy_training_mode=str(config.get("policy_training_mode", "intermittent")),
-        final_policy_network_train_steps=(
+        "advantage_replay_sampling": str(
+            config.get("advantage_replay_sampling", "uniform")
+        ),
+        "average_strategy_weighting": str(
+            config.get("average_strategy_weighting", "linear")
+        ),
+        "priority_alpha": float(config.get("priority_alpha", 1.0)),
+        "priority_epsilon": float(config.get("priority_epsilon", 1e-6)),
+        "policy_network_train_every": policy_network_train_every,
+        "evaluation_interval": int(config["evaluation_interval"]),
+        "policy_training_mode": str(config.get("policy_training_mode", "intermittent")),
+        "final_policy_network_train_steps": (
             int(config["final_policy_network_train_steps"])
             if config.get("final_policy_network_train_steps") is not None
             else None
         ),
-    )
+    }
+    execution_backend = str(config.get("execution_backend", "sequential")).lower()
+    if execution_backend == "sequential":
+        return DeepCFRSolver(game, **solver_kwargs)
+    if execution_backend == "ray_parallel":
+        from .parallel_solver import ParallelDeepCFRSolver
+
+        return ParallelDeepCFRSolver(
+            game,
+            game_name=str(config["game_name"]),
+            parallel_num_workers=int(config.get("parallel_num_workers", 3)),
+            parallel_run_seed=int(config.get("parallel_run_seed", 0)),
+            parallel_ray_address=config.get("parallel_ray_address"),
+            parallel_log_to_driver=bool(config.get("parallel_log_to_driver", False)),
+            **solver_kwargs,
+        )
+    raise ValueError(f"Unsupported execution_backend: {execution_backend!r}")
 
 
 def game_value_player_0(config: Mapping[str, object]) -> float:
@@ -209,109 +231,140 @@ def run_single_seed(
     batch_size_advantage, batch_size_strategy = resolve_solver_batch_sizes(config)
     config["batch_size_advantage"] = batch_size_advantage
     config["batch_size_strategy"] = batch_size_strategy
+    if config.get("parallel_run_seed") is None:
+        config["parallel_run_seed"] = int(seed)
     set_seed(seed)
+    run_start = time.perf_counter()
     game = pyspiel.load_game(config["game_name"])
-    solver = make_solver(game, config)
+    solver = None
+    try:
+        solver_init_start = time.perf_counter()
+        solver = make_solver(game, config)
+        solver_initialization_seconds = time.perf_counter() - solver_init_start
 
-    solve_result: SolveResult = solver.solve()
+        solve_start = time.perf_counter()
+        solve_result: SolveResult = solver.solve()
+        elapsed_seconds = time.perf_counter() - solve_start
 
-    convs = solve_result.nash_conv
-    nodes_touched = solve_result.nodes_touched
-    avg_policy_values = solve_result.average_policy_value
-    diagnostics = solve_result.diagnostics
+        convs = solve_result.nash_conv
+        nodes_touched = solve_result.nodes_touched
+        avg_policy_values = solve_result.average_policy_value
+        diagnostics = solve_result.diagnostics
 
-    exploitability_curve = np.asarray(convs, dtype=np.float64) / 2.0
-    nodes_touched = np.asarray(nodes_touched, dtype=np.float64)
-    avg_policy_values = np.asarray(avg_policy_values, dtype=np.float64)
-    value_target = game_value_player_0(config)
-    value_signed_error = avg_policy_values - value_target
-    value_error = np.abs(value_signed_error)
+        exploitability_curve = np.asarray(convs, dtype=np.float64) / 2.0
+        nodes_touched = np.asarray(nodes_touched, dtype=np.float64)
+        avg_policy_values = np.asarray(avg_policy_values, dtype=np.float64)
+        value_target = game_value_player_0(config)
+        value_signed_error = avg_policy_values - value_target
+        value_error = np.abs(value_signed_error)
 
-    diagnostics = {k: np.asarray(v) for k, v in diagnostics.items()}
-    iterations = diagnostics["iteration"].astype(int)
-    wall_clock = diagnostics["wall_clock_seconds"].astype(float)
+        diagnostics = {k: np.asarray(v) for k, v in diagnostics.items()}
+        iterations = diagnostics["iteration"].astype(int)
+        wall_clock = diagnostics["wall_clock_seconds"].astype(float)
 
-    final_policy = policy.tabular_policy_from_callable(game, solver.action_probabilities)
-    final_nash_conv = exploitability.nash_conv(game, final_policy)
-    final_policy_value = expected_game_score.policy_value(
-        game.new_initial_state(), [final_policy] * game.num_players()
-    )[0]
-
-    summary = {
-        "seed": int(seed),
-        "final_exploitability": float(exploitability_curve[-1]),
-        "best_exploitability": float(np.nanmin(exploitability_curve)),
-        "final_window_mean_exploitability": final_window_mean(
-            exploitability_curve, window=final_window
-        ),
-        "final_policy_value": float(final_policy_value),
-        "final_policy_value_signed_error": float(
-            final_policy_value - value_target
-        ),
-        "final_policy_value_error": float(
-            abs(final_policy_value - value_target)
-        ),
-        "best_policy_value_error": float(np.nanmin(value_error)),
-        "final_nodes_touched": float(nodes_touched[-1]),
-        "final_wall_clock_seconds": float(wall_clock[-1]),
-        "nodes_to_exploitability_threshold": first_nodes_to_threshold(
-            nodes_touched, exploitability_curve, config["exploitability_threshold"]
-        ),
-        "seconds_to_exploitability_threshold": first_time_to_threshold(
-            wall_clock, exploitability_curve, config["exploitability_threshold"]
-        ),
-        "final_legal_action_mass_mean": float(diagnostics["legal_action_mass_mean"][-1]),
-        "final_legal_action_mass_min": float(diagnostics["legal_action_mass_min"][-1]),
-        "final_policy_normalized_entropy_mean": float(
-            diagnostics["policy_normalized_entropy_mean"][-1]
-        ),
-        "final_advantage_target_variance": float(
-            diagnostics["advantage_target_variance"][-1]
-        ),
-        "final_policy_loss": float(diagnostics["policy_loss"][-1]),
-        "final_policy_grad_norm": float(diagnostics["policy_grad_norm"][-1]),
-        "final_advantage_grad_norm_player_0": float(
-            diagnostics["advantage_grad_norm_player_0"][-1]
-        ),
-        "final_advantage_grad_norm_player_1": float(
-            diagnostics["advantage_grad_norm_player_1"][-1]
-        ),
-        "final_policy_training_events": int(
-            diagnostics.get("policy_training_events", [0])[-1]
-        ),
-        "final_policy_gradient_steps": int(
-            diagnostics.get("policy_gradient_steps", [0])[-1]
-        ),
-        "final_learning_rate": float(
-            diagnostics.get("learning_rate", [config["learning_rate"]])[-1]
-        ),
-        "final_nash_conv_recomputed": float(final_nash_conv),
-    }
-
-    result = {
-        "seed": int(seed),
-        "iterations": iterations,
-        "nodes_touched": nodes_touched,
-        "wall_clock_seconds": wall_clock,
-        "exploitability": exploitability_curve,
-        "average_policy_value": avg_policy_values,
-        "policy_value_signed_error": value_signed_error,
-        "policy_value_error": value_error,
-        "diagnostics": diagnostics,
-        "summary": summary,
-    }
-
-    if save_final_checkpoint and export_dir is not None:
-        checkpoint_dir = Path(export_dir) / "checkpoints"
-        checkpoint_dir.mkdir(parents=True, exist_ok=True)
-        torch.save(
-            solver.extract_full_model(),
-            checkpoint_dir / f"seed_{seed}_final_model.pt",
+        final_policy = policy.tabular_policy_from_callable(
+            game, solver.action_probabilities
         )
+        final_nash_conv = exploitability.nash_conv(game, final_policy)
+        final_policy_value = expected_game_score.policy_value(
+            game.new_initial_state(), [final_policy] * game.num_players()
+        )[0]
+        end_to_end_seconds = time.perf_counter() - run_start
 
-    del solver, solve_result, final_policy, game
-    cleanup_training_memory()
-    return result
+        summary = {
+            "seed": int(seed),
+            "execution_backend": str(getattr(solver, "execution_backend", "sequential")),
+            "parallel_num_workers": int(getattr(solver, "parallel_num_workers", 1)),
+            "solver_initialization_seconds": float(solver_initialization_seconds),
+            "elapsed_seconds": float(elapsed_seconds),
+            "end_to_end_seconds": float(end_to_end_seconds),
+            "traversal_collection_seconds": float(
+                diagnostics.get("cumulative_traversal_collection_seconds", [float("nan")])[-1]
+            ),
+            "final_exploitability": float(exploitability_curve[-1]),
+            "best_exploitability": float(np.nanmin(exploitability_curve)),
+            "final_window_mean_exploitability": final_window_mean(
+                exploitability_curve, window=final_window
+            ),
+            "final_policy_value": float(final_policy_value),
+            "final_policy_value_signed_error": float(
+                final_policy_value - value_target
+            ),
+            "final_policy_value_error": float(
+                abs(final_policy_value - value_target)
+            ),
+            "best_policy_value_error": float(np.nanmin(value_error)),
+            "final_nodes_touched": float(nodes_touched[-1]),
+            "final_wall_clock_seconds": float(wall_clock[-1]),
+            "nodes_to_exploitability_threshold": first_nodes_to_threshold(
+                nodes_touched, exploitability_curve, config["exploitability_threshold"]
+            ),
+            "seconds_to_exploitability_threshold": first_time_to_threshold(
+                wall_clock, exploitability_curve, config["exploitability_threshold"]
+            ),
+            "final_legal_action_mass_mean": float(
+                diagnostics["legal_action_mass_mean"][-1]
+            ),
+            "final_legal_action_mass_min": float(diagnostics["legal_action_mass_min"][-1]),
+            "final_policy_normalized_entropy_mean": float(
+                diagnostics["policy_normalized_entropy_mean"][-1]
+            ),
+            "final_advantage_target_variance": float(
+                diagnostics["advantage_target_variance"][-1]
+            ),
+            "final_policy_loss": float(diagnostics["policy_loss"][-1]),
+            "final_policy_grad_norm": float(diagnostics["policy_grad_norm"][-1]),
+            "final_advantage_grad_norm_player_0": float(
+                diagnostics["advantage_grad_norm_player_0"][-1]
+            ),
+            "final_advantage_grad_norm_player_1": float(
+                diagnostics["advantage_grad_norm_player_1"][-1]
+            ),
+            "final_policy_training_events": int(
+                diagnostics.get("policy_training_events", [0])[-1]
+            ),
+            "final_policy_gradient_steps": int(
+                diagnostics.get("policy_gradient_steps", [0])[-1]
+            ),
+            "final_learning_rate": float(
+                diagnostics.get("learning_rate", [config["learning_rate"]])[-1]
+            ),
+            "final_nash_conv_recomputed": float(final_nash_conv),
+        }
+
+        result = {
+            "seed": int(seed),
+            "execution_backend": summary["execution_backend"],
+            "parallel_num_workers": summary["parallel_num_workers"],
+            "solver_initialization_seconds": float(solver_initialization_seconds),
+            "elapsed_seconds": float(elapsed_seconds),
+            "end_to_end_seconds": float(end_to_end_seconds),
+            "iterations": iterations,
+            "nodes_touched": nodes_touched,
+            "wall_clock_seconds": wall_clock,
+            "exploitability": exploitability_curve,
+            "average_policy_value": avg_policy_values,
+            "policy_value_signed_error": value_signed_error,
+            "policy_value_error": value_error,
+            "diagnostics": diagnostics,
+            "summary": summary,
+        }
+
+        if save_final_checkpoint and export_dir is not None:
+            checkpoint_dir = Path(export_dir) / "checkpoints"
+            checkpoint_dir.mkdir(parents=True, exist_ok=True)
+            torch.save(
+                solver.extract_full_model(),
+                checkpoint_dir / f"seed_{seed}_final_model.pt",
+            )
+
+        return result
+    finally:
+        if solver is not None:
+            close = getattr(solver, "close", None)
+            if callable(close):
+                close()
+        cleanup_training_memory()
 
 
 def create_run_dir(output_root, experiment_name: str) -> Path:
@@ -568,6 +621,8 @@ def export_results(
         "config_label",
         "variant_id",
         "variant_label",
+        "execution_backend",
+        "parallel_num_workers",
         "schedule",
         "schedule_label",
         "learning_rate_schedule",
@@ -585,6 +640,8 @@ def export_results(
         "iteration",
         "nodes_touched",
         "wall_clock_seconds",
+        "traversal_collection_seconds",
+        "cumulative_traversal_collection_seconds",
         "exploitability",
         "average_policy_value",
         "policy_value_signed_error",
@@ -630,6 +687,8 @@ def export_results(
                         "config_label": result.get("config_label", ""),
                         "variant_id": result.get("variant_id", ""),
                         "variant_label": result.get("variant_label", ""),
+                        "execution_backend": result.get("execution_backend", ""),
+                        "parallel_num_workers": result.get("parallel_num_workers", ""),
                         "schedule": result.get("schedule", ""),
                         "schedule_label": result.get("schedule_label", ""),
                         "learning_rate_schedule": result.get(
@@ -659,6 +718,18 @@ def export_results(
                         "iteration": int(iteration),
                         "nodes_touched": float(result["nodes_touched"][i]),
                         "wall_clock_seconds": float(result["wall_clock_seconds"][i]),
+                        "traversal_collection_seconds": float(
+                            diag.get(
+                                "traversal_collection_seconds",
+                                [float("nan")] * len(result["iterations"]),
+                            )[i]
+                        ),
+                        "cumulative_traversal_collection_seconds": float(
+                            diag.get(
+                                "cumulative_traversal_collection_seconds",
+                                [float("nan")] * len(result["iterations"]),
+                            )[i]
+                        ),
                         "exploitability": float(result["exploitability"][i]),
                         "average_policy_value": float(result["average_policy_value"][i]),
                         "policy_value_signed_error": float(
@@ -793,6 +864,10 @@ def export_results(
     nodes_mat = _stack_padded(r["nodes_touched"] for r in results)
     wall_clock_mat = _stack_padded(r["wall_clock_seconds"] for r in results)
     avg_policy_value_mat = _stack_padded(r["average_policy_value"] for r in results)
+    traversal_collection_mat = _stack_padded(
+        r["diagnostics"].get("cumulative_traversal_collection_seconds", [])
+        for r in results
+    )
 
     if write_multiseed_npz:
         with np.errstate(invalid="ignore"):
@@ -805,6 +880,7 @@ def export_results(
                 average_policy_value=avg_policy_value_mat,
                 nodes_touched=nodes_mat,
                 wall_clock_seconds=wall_clock_mat,
+                cumulative_traversal_collection_seconds=traversal_collection_mat,
                 mean_exploitability=np.nanmean(exploitability_mat, axis=0),
                 se_exploitability=stats.sem(
                     exploitability_mat, axis=0, nan_policy="omit"

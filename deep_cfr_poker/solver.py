@@ -323,6 +323,7 @@ class DeepCFRSolver(policy.Policy):
         self._nodes_touched = 0
         self._nodes_touched_history: List[int] = []
         self._average_policy_value_history: List[float] = []
+        self._cumulative_traversal_collection_seconds = 0.0
         self._last_advantage_grad_norm = [float("nan")] * self._num_players
         self._last_policy_grad_norm = float("nan")
         self._last_processed_advantage_target_mean = [
@@ -358,6 +359,14 @@ class DeepCFRSolver(policy.Policy):
     @property
     def strategy_buffer(self) -> ReservoirBuffer:
         return self._strategy_memories
+
+    @property
+    def execution_backend(self) -> str:
+        return "sequential"
+
+    @property
+    def parallel_num_workers(self) -> int:
+        return 1
 
     def clear_advantage_buffers(self) -> None:
         for buf in self._advantage_memories:
@@ -498,9 +507,13 @@ class DeepCFRSolver(policy.Policy):
                 and self._uses_shared_advantage_trunk
             ):
                 self.reinitialize_advantage_networks()
+            collection_seconds_this_iteration = 0.0
             for p in range(self._num_players):
-                for _ in range(self._num_traversals):
-                    self._traverse_game_tree(self._root_node, p)
+                collection_start = time.perf_counter()
+                self._collect_traversals_for_player(p)
+                collection_elapsed = time.perf_counter() - collection_start
+                collection_seconds_this_iteration += collection_elapsed
+                self._cumulative_traversal_collection_seconds += collection_elapsed
 
                 if (
                     self._reinitialize_advantage_networks
@@ -586,6 +599,12 @@ class DeepCFRSolver(policy.Policy):
             diagnostics["iteration"].append(int(it + 1))
             diagnostics["wall_clock_seconds"].append(
                 float(time.perf_counter() - start_time)
+            )
+            diagnostics["traversal_collection_seconds"].append(
+                float(collection_seconds_this_iteration)
+            )
+            diagnostics["cumulative_traversal_collection_seconds"].append(
+                float(self._cumulative_traversal_collection_seconds)
             )
             diagnostics["learning_rate"].append(float(self._learning_rate))
             diagnostics["strategy_buffer_size"].append(int(len(self._strategy_memories)))
@@ -703,6 +722,11 @@ class DeepCFRSolver(policy.Policy):
         )
 
     # ----------------------------------------------------------- traversal
+
+    def _collect_traversals_for_player(self, player: int) -> None:
+        """Collects this iteration's traversal samples for one player."""
+        for _ in range(self._num_traversals):
+            self._traverse_game_tree(self._root_node, int(player))
 
     def _traverse_game_tree(self, state, player: int) -> float:
         """External-sampling traversal that populates the replay buffers.

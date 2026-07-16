@@ -126,7 +126,11 @@ The repository is organised so that each experiment can be run independently whi
 │       │   ├── config.py
 │       │   ├── run.py
 │       │   └── README.md
-│       └── deep_cfr_composite_learning_rate_ablation/ # Experiment 24
+│       ├── deep_cfr_composite_learning_rate_ablation/ # Experiment 24
+│       │   ├── config.py
+│       │   ├── run.py
+│       │   └── README.md
+│       └── deep_cfr_parallel_equivalence_ablation/ # Experiment 25
 │           ├── config.py
 │           ├── run.py
 │           └── README.md
@@ -339,6 +343,14 @@ Starts from the current best candidate baseline and varies only replay reservoir
 Starts from the current best candidate baseline and varies only constant learning-rate magnitude. This deliberately differs from experiment 7, which tested learning-rate schedules on the older baseline. The default run uses three matched seeds for screening before any higher-seed confirmation run.
 
 **Question:** is the improved baseline sensitive to a modest constant learning-rate change, despite the earlier negative result for scheduled decay?
+
+### 25. Leduc poker Deep CFR parallel-equivalence ablation
+
+[`experiments/leduc_poker/deep_cfr_parallel_equivalence_ablation/`](experiments/leduc_poker/deep_cfr_parallel_equivalence_ablation/README.md)
+
+Compares the current best Deep CFR configuration against the same learner with ESCHER-style Ray-parallel traversal collection. The two arms are run over three matched seeds and report paired learning-quality deltas plus solver-initialisation, training-loop, end-to-end, and traversal-collection timing.
+
+**Question:** can traversal collection be parallelised without materially changing the learned policy, and does the parallel backend reduce runtime enough to justify using it for larger poker games?
 
 ## Setup
 
@@ -874,6 +886,49 @@ python -m experiments.leduc_poker.deep_cfr_composite_learning_rate_ablation.run 
     --batch-size-strategy 2 \
     --memory-capacity 256 \
     --output-root outputs/cloud/smoke-exp24-learning-rate" \
+  "n2-standard-4" \
+  "3600" \
+  "4000" \
+  "16000"
+
+# Experiment 25 — parallel-equivalence ablation
+python -m experiments.leduc_poker.deep_cfr_parallel_equivalence_ablation.run
+
+# Experiment 25 — local quick smoke test
+python -m experiments.leduc_poker.deep_cfr_parallel_equivalence_ablation.run \
+  --seeds 1234 \
+  --iterations 3 \
+  --traversals 4 \
+  --evaluation-interval 1 \
+  --policy-network-train-every 1 \
+  --policy-network-train-steps 1 \
+  --advantage-network-train-steps 1 \
+  --policy-network-layers 8,8 \
+  --advantage-network-layers 8,8 \
+  --batch-size-advantage 2 \
+  --batch-size-strategy 2 \
+  --memory-capacity 256 \
+  --parallel-num-workers 2 \
+  --output-root outputs/smoke_tests
+
+# Experiment 25 — GCP Batch quick smoke test
+./gcp/submit_batch_experiment.sh \
+  "smoke-exp25-parallel-equivalence-$(date +%Y%m%d-%H%M%S)" \
+  "python -m experiments.leduc_poker.deep_cfr_parallel_equivalence_ablation.run \
+    --seeds 1234 \
+    --iterations 3 \
+    --traversals 4 \
+    --evaluation-interval 1 \
+    --policy-network-train-every 1 \
+    --policy-network-train-steps 1 \
+    --advantage-network-train-steps 1 \
+    --policy-network-layers 8,8 \
+    --advantage-network-layers 8,8 \
+    --batch-size-advantage 2 \
+    --batch-size-strategy 2 \
+    --memory-capacity 256 \
+    --parallel-num-workers 2 \
+    --output-root outputs/cloud/smoke-exp25-parallel-equivalence" \
   "n2-standard-4" \
   "3600" \
   "4000" \
