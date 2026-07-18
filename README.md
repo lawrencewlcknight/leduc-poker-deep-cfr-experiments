@@ -350,6 +350,10 @@ Starts from the current best candidate baseline and varies only constant learnin
 
 Compares the current best Deep CFR configuration against the same learner with ESCHER-style Ray-parallel traversal collection. The two arms are run over three matched seeds and report paired learning-quality deltas plus solver-initialisation, training-loop, end-to-end, and traversal-collection timing.
 
+Each variant/seed arm is isolated in a subprocess by default, so the experiment
+can be submitted as one Batch job while still releasing replay memory, PyTorch
+allocator state, and Ray actors between independent runs.
+
 **Question:** can traversal collection be parallelised without materially changing the learned policy, and does the parallel backend reduce runtime enough to justify using it for larger poker games?
 
 ## Setup

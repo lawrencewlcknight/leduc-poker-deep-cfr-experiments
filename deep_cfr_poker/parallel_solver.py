@@ -82,15 +82,20 @@ class DeepCFRTraversalWorker:
                 int(player),
             )
 
+        advantage_memories = [
+            list(buffer)
+            for buffer in self._solver.advantage_buffers
+        ]
+        strategy_memories = list(self._solver.strategy_buffer)
+        self._solver.clear_advantage_buffers()
+        self._solver.strategy_buffer.clear()
+
         return {
             "nodes_touched": int(
                 self._solver._nodes_touched - before  # pylint: disable=protected-access
             ),
-            "advantage_memories": [
-                list(buffer)
-                for buffer in self._solver.advantage_buffers
-            ],
-            "strategy_memories": list(self._solver.strategy_buffer),
+            "advantage_memories": advantage_memories,
+            "strategy_memories": strategy_memories,
         }
 
 
@@ -212,6 +217,7 @@ class ParallelDeepCFRSolver(DeepCFRSolver):
                     self._advantage_memories[player_index].add(memory)
             for memory in row["strategy_memories"]:
                 self._strategy_memories.add(memory)
+        del results, refs, weights_ref
 
     def __del__(self):
         try:

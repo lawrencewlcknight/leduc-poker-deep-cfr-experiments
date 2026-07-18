@@ -21,7 +21,9 @@ from experiments.leduc_poker.deep_cfr_parallel_equivalence_ablation.config impor
 )
 from experiments.leduc_poker.deep_cfr_parallel_equivalence_ablation.run import (
     _execution_variant_config,
+    _worker_stem,
     build_config,
+    build_parser,
 )
 
 
@@ -101,3 +103,16 @@ def test_parallel_worker_override_only_affects_parallel_arm():
     parallel = _execution_variant_config(config, config["ablation_variants"][1])
     assert sequential["parallel_num_workers"] == 1
     assert parallel["parallel_num_workers"] == 2
+
+
+def test_subprocess_isolation_cli_defaults_to_enabled():
+    parser = build_parser()
+    args = parser.parse_args([])
+    assert args.disable_subprocess_isolation is False
+
+    disabled = parser.parse_args(["--disable-subprocess-isolation"])
+    assert disabled.disable_subprocess_isolation is True
+
+
+def test_worker_stem_is_safe_for_paths():
+    assert _worker_stem("parallel/arm:1", 1234) == "parallel_arm_1_seed_1234"

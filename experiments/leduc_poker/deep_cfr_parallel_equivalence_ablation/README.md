@@ -13,6 +13,12 @@ changes.
 
 The default run uses three matched seeds: `1234,2025,31415`.
 
+Each variant/seed training run is launched in its own Python subprocess by
+default. This keeps a single Batch job interface while ensuring replay buffers,
+PyTorch allocator state, and Ray actors are released at process exit before the
+next arm starts. Use `--disable-subprocess-isolation` only when debugging the
+runner itself.
+
 ## Run
 
 ```bash
@@ -76,5 +82,6 @@ The runner writes the standard experiment artefacts plus:
 - `parallel_equivalence_summary.json` — practical-equivalence summaries for final exploitability and final policy value.
 - `runtime_by_variant.png` — training-loop, end-to-end, and traversal-collection runtime bars.
 - `traversal_collection_seconds_by_nodes.png` — cumulative traversal-collection time by nodes touched.
+- `worker_logs/` and `worker_results/` — subprocess logs and per-run result payloads used by the parent process.
 
 For thesis figures, prefer the longitudinal `*_by_nodes.png` charts.

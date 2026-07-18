@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import logging
 import os
+import pickle
+import subprocess
+import sys
 import traceback
 import warnings
 from copy import deepcopy
 from pathlib import Path
-from typing import List, Mapping, Optional, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 os.environ.setdefault("MPLCONFIGDIR", "/private/tmp/deep_cfr_poker_matplotlib")
@@ -84,6 +88,18 @@ def build_parser():
     parser.add_argument("--parallel-num-workers", type=int, default=None)
     parser.add_argument("--parallel-ray-address", default=None)
     parser.add_argument("--parallel-log-to-driver", type=_str2bool, default=None)
+    parser.add_argument(
+        "--disable-subprocess-isolation",
+        action="store_true",
+        help=(
+            "Run all variant/seed trainings in the parent process. By default "
+            "each independent training runs in a fresh Python worker so replay "
+            "buffers, PyTorch allocator state, and Ray actors are fully "
+            "released between runs."
+        ),
+    )
+    parser.add_argument("--worker-input-json", default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--worker-output-pickle", default=None, help=argparse.SUPPRESS)
     return parser
 
 
@@ -163,6 +179,183 @@ def _augment_parallel_result(
     result["summary"]["execution_backend"] = result["execution_backend"]
     result["summary"]["parallel_num_workers"] = result["parallel_num_workers"]
     return result
+
+
+def _safe_stem(value: str) -> str:
+    return "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in value)
+
+
+def _worker_stem(variant_id: str, seed: int) -> str:
+    return f"{_safe_stem(str(variant_id))}_seed_{int(seed)}"
+
+
+def _write_worker_pickle(path: Path, payload: Mapping[str, Any]) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "wb") as f:
+        pickle.dump(dict(payload), f, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def _read_worker_pickle(path: Path) -> Dict[str, Any]:
+    with open(path, "rb") as f:
+        return pickle.load(f)
+
+
+def _tail_text(path: Path, *, max_chars: int = 12000) -> str:
+    try:
+        text = Path(path).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    return text[-max_chars:]
+
+
+def _run_worker(worker_input_json: str, worker_output_pickle: str) -> int:
+    output_path = Path(worker_output_pickle)
+    try:
+        with open(worker_input_json, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+        variant_config = dict(payload["config"])
+        final_window = int(payload["final_window"])
+        result = run_single_seed(
+            int(payload["seed"]),
+            variant_config,
+            export_dir=Path(payload["export_dir"]),
+            save_final_checkpoint=bool(payload.get("save_final_checkpoint", False)),
+            final_window=final_window,
+        )
+        result = _augment_parallel_result(
+            result,
+            variant_config,
+            final_window,
+            float(payload["exploitability_threshold"]),
+        )
+        _write_worker_pickle(output_path, {"ok": True, "result": result})
+        return 0
+    except Exception as exc:  # pragma: no cover - operational safety net
+        _write_worker_pickle(
+            output_path,
+            {
+                "ok": False,
+                "error": str(exc),
+                "traceback": traceback.format_exc(),
+            },
+        )
+        return 1
+
+
+def _run_seed_variant_subprocess(
+    seed: int,
+    variant_config: Mapping[str, object],
+    run_dir: Path,
+    *,
+    final_window: int,
+    exploitability_threshold: float,
+    save_final_checkpoint: bool,
+) -> dict:
+    run_dir = Path(run_dir)
+    stem = _worker_stem(str(variant_config["variant_id"]), int(seed))
+    worker_input = run_dir / "worker_inputs" / f"{stem}.json"
+    worker_output = run_dir / "worker_results" / f"{stem}.pickle"
+    worker_log = run_dir / "worker_logs" / f"{stem}.log"
+    worker_export_dir = run_dir / "worker_exports" / stem
+    worker_input.parent.mkdir(parents=True, exist_ok=True)
+    worker_log.parent.mkdir(parents=True, exist_ok=True)
+
+    payload = {
+        "seed": int(seed),
+        "config": json_safe(dict(variant_config)),
+        "export_dir": str(worker_export_dir if save_final_checkpoint else run_dir),
+        "save_final_checkpoint": bool(save_final_checkpoint),
+        "final_window": int(final_window),
+        "exploitability_threshold": float(exploitability_threshold),
+    }
+    with open(worker_input, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+
+    command = [
+        sys.executable,
+        "-m",
+        "experiments.leduc_poker.deep_cfr_parallel_equivalence_ablation.run",
+        "--worker-input-json",
+        str(worker_input),
+        "--worker-output-pickle",
+        str(worker_output),
+    ]
+    env = os.environ.copy()
+    env.setdefault("CUDA_VISIBLE_DEVICES", "")
+    env.setdefault("MPLCONFIGDIR", "/private/tmp/deep_cfr_poker_matplotlib")
+    env.setdefault("XDG_CACHE_HOME", "/private/tmp/deep_cfr_poker_cache")
+    env.setdefault("PYTHONUNBUFFERED", "1")
+    with open(worker_log, "w", encoding="utf-8") as log_file:
+        completed = subprocess.run(
+            command,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            text=True,
+            env=env,
+        )
+
+    try:
+        worker_payload = (
+            _read_worker_pickle(worker_output) if worker_output.exists() else None
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            f"Worker wrote an unreadable result at {worker_output}: {exc}. "
+            f"See {worker_log}.\n{_tail_text(worker_log)}"
+        ) from exc
+    if (
+        completed.returncode == 0
+        and worker_payload is not None
+        and bool(worker_payload.get("ok", False))
+    ):
+        return worker_payload["result"]
+
+    log_tail = _tail_text(worker_log)
+    if worker_payload is None:
+        raise RuntimeError(
+            f"Worker failed with exit code {completed.returncode} and did not "
+            f"write {worker_output}. See {worker_log}.\n{log_tail}"
+        )
+    raise RuntimeError(
+        f"Worker failed with exit code {completed.returncode}: "
+        f"{worker_payload.get('error', 'unknown error')}. See {worker_log}.\n"
+        f"{worker_payload.get('traceback', '')}\n{log_tail}"
+    )
+
+
+def _run_seed_variant(
+    seed: int,
+    variant_config: Mapping[str, object],
+    run_dir: Path,
+    *,
+    subprocess_isolation_enabled: bool,
+    final_window: int,
+    exploitability_threshold: float,
+    save_final_checkpoint: bool,
+) -> dict:
+    if subprocess_isolation_enabled:
+        return _run_seed_variant_subprocess(
+            seed,
+            variant_config,
+            run_dir,
+            final_window=final_window,
+            exploitability_threshold=exploitability_threshold,
+            save_final_checkpoint=save_final_checkpoint,
+        )
+    result = run_single_seed(
+        seed,
+        dict(variant_config),
+        export_dir=run_dir,
+        save_final_checkpoint=save_final_checkpoint,
+        final_window=final_window,
+    )
+    return _augment_parallel_result(
+        result,
+        variant_config,
+        final_window,
+        exploitability_threshold,
+    )
 
 
 def _results_for_variant(results: Sequence[dict], variant_id: str) -> List[dict]:
@@ -408,8 +601,19 @@ def write_parallel_equivalence_outputs(
 def main(argv: Optional[List[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.worker_input_json or args.worker_output_pickle:
+        if not args.worker_input_json or not args.worker_output_pickle:
+            parser.error(
+                "--worker-input-json and --worker-output-pickle must be used together"
+            )
+        return _run_worker(args.worker_input_json, args.worker_output_pickle)
+
     config = build_config(args)
     seeds = parse_seeds(args.seeds, DEFAULT_SEEDS)
+    subprocess_isolation_enabled = not bool(args.disable_subprocess_isolation)
+    config["subprocess_isolation_enabled"] = bool(subprocess_isolation_enabled)
+    config["worker_results_dir"] = "worker_results"
+    config["worker_logs_dir"] = "worker_logs"
 
     if args.run_dir:
         run_dir = Path(args.run_dir).resolve()
@@ -421,6 +625,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     _LOGGER.info("Run directory: %s", run_dir.resolve())
     _LOGGER.info("Configuration: %s", config)
     _LOGGER.info("Seeds: %s", seeds)
+    _LOGGER.info("Subprocess isolation enabled: %s", subprocess_isolation_enabled)
 
     results = []
     failed = []
@@ -433,21 +638,16 @@ def main(argv: Optional[List[str]] = None) -> int:
         )
         for seed in tqdm(seeds, desc=str(variant_config["variant_id"])):
             try:
-                result = run_single_seed(
+                result = _run_seed_variant(
                     seed,
                     variant_config,
-                    export_dir=run_dir,
-                    save_final_checkpoint=args.save_final_checkpoints,
+                    run_dir,
+                    subprocess_isolation_enabled=subprocess_isolation_enabled,
                     final_window=args.final_window,
+                    exploitability_threshold=float(config["exploitability_threshold"]),
+                    save_final_checkpoint=args.save_final_checkpoints,
                 )
-                results.append(
-                    _augment_parallel_result(
-                        result,
-                        variant_config,
-                        args.final_window,
-                        float(config["exploitability_threshold"]),
-                    )
-                )
+                results.append(result)
             except Exception as exc:  # pragma: no cover
                 _LOGGER.exception(
                     "Seed %s failed for variant %s: %s",
@@ -479,7 +679,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             "configuration with the same learner using Ray-parallel traversal "
             "collection. Learning-quality charts should be read by nodes "
             "touched; timing outputs report solver initialisation, training "
-            "loop, end-to-end, and traversal-collection seconds."
+            "loop, end-to-end, and traversal-collection seconds. Variant/seed "
+            "runs are isolated in subprocesses by default so replay memory, "
+            "PyTorch allocator state, and Ray actors are released after each "
+            "independent run."
         ),
     )
     parallel_info = write_parallel_equivalence_outputs(
