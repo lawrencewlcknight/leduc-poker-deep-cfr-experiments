@@ -13,6 +13,7 @@ DEFAULT_SEEDS = [1234, 2025, 31415]
 SEQUENTIAL_VARIANT_ID = "composite_best_sequential"
 PARALLEL_VARIANT_ID = "composite_best_ray_parallel"
 PARALLEL_NUM_WORKERS = 3
+PARALLEL_RAY_OBJECT_STORE_MEMORY = 512 * 1024 * 1024
 
 # Pre-declared practical-equivalence margins. These are absolute differences
 # in final metrics, not post-hoc tuning objectives.
@@ -61,5 +62,8 @@ DEFAULT_CONFIG.update({
     "parallel_num_workers": PARALLEL_NUM_WORKERS,
     "parallel_ray_address": None,
     "parallel_log_to_driver": False,
+    "parallel_ray_object_store_memory": PARALLEL_RAY_OBJECT_STORE_MEMORY,
+    "parallel_worker_memory_capacity": None,
+    "replay_buffer_type": "compact",
     "save_final_checkpoints": False,
 })

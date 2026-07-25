@@ -88,6 +88,17 @@ def build_parser():
     parser.add_argument("--parallel-num-workers", type=int, default=None)
     parser.add_argument("--parallel-ray-address", default=None)
     parser.add_argument("--parallel-log-to-driver", type=_str2bool, default=None)
+    parser.add_argument("--parallel-worker-memory-capacity", type=int, default=None)
+    parser.add_argument("--parallel-ray-object-store-memory", type=int, default=None)
+    parser.add_argument(
+        "--replay-buffer-type",
+        choices=("python", "compact"),
+        default=None,
+        help=(
+            "Replay storage backend. Experiment 25 defaults to compact array "
+            "storage to keep the parallel comparison memory-feasible."
+        ),
+    )
     parser.add_argument(
         "--disable-subprocess-isolation",
         action="store_true",
@@ -135,6 +146,9 @@ def build_config(args) -> dict:
         "parallel_num_workers": args.parallel_num_workers,
         "parallel_ray_address": args.parallel_ray_address,
         "parallel_log_to_driver": args.parallel_log_to_driver,
+        "parallel_worker_memory_capacity": args.parallel_worker_memory_capacity,
+        "parallel_ray_object_store_memory": args.parallel_ray_object_store_memory,
+        "replay_buffer_type": args.replay_buffer_type,
     }
     for key, value in overrides.items():
         if value is not None:
@@ -176,8 +190,20 @@ def _augment_parallel_result(
     )
     result["execution_backend"] = str(variant_config.get("execution_backend", ""))
     result["parallel_num_workers"] = int(variant_config.get("parallel_num_workers", 1))
+    result["replay_buffer_type"] = str(variant_config.get("replay_buffer_type", ""))
     result["summary"]["execution_backend"] = result["execution_backend"]
     result["summary"]["parallel_num_workers"] = result["parallel_num_workers"]
+    result["summary"]["replay_buffer_type"] = result["replay_buffer_type"]
+    result["summary"]["parallel_worker_memory_capacity"] = (
+        int(variant_config["parallel_worker_memory_capacity"])
+        if variant_config.get("parallel_worker_memory_capacity") is not None
+        else float("nan")
+    )
+    result["summary"]["parallel_ray_object_store_memory"] = (
+        int(variant_config["parallel_ray_object_store_memory"])
+        if variant_config.get("parallel_ray_object_store_memory") is not None
+        else float("nan")
+    )
     return result
 
 
@@ -714,6 +740,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         parallel_info["parallel_equivalence_summary"].resolve(),
     )
     _LOGGER.info("All outputs saved to: %s", run_dir.resolve())
+    if failed:
+        _LOGGER.error(
+            "Experiment completed with %d failed variant/seed run(s). "
+            "Returning non-zero status so Batch marks the comparison failed.",
+            len(failed),
+        )
+        return 1
     return 0
 
 

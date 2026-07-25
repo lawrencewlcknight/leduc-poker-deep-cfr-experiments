@@ -19,6 +19,13 @@ PyTorch allocator state, and Ray actors are released at process exit before the
 next arm starts. Use `--disable-subprocess-isolation` only when debugging the
 runner itself.
 
+The default comparison also uses compact array-backed replay storage and
+partitioned Ray-worker replay capacity. This avoids multiplying the full replay
+reservoir across the learner and every traversal actor, which is essential
+before applying this implementation to larger poker games. Ray's local object
+store is capped at 512 MiB by default for this experiment; override with
+`--parallel-ray-object-store-memory` only if larger worker payloads require it.
+
 ## Run
 
 ```bash

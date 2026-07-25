@@ -15,6 +15,7 @@ from experiments.leduc_poker.deep_cfr_parallel_equivalence_ablation.config impor
     FINAL_EXPLOITABILITY_EQUIVALENCE_MARGIN,
     FINAL_POLICY_VALUE_EQUIVALENCE_MARGIN,
     PARALLEL_NUM_WORKERS,
+    PARALLEL_RAY_OBJECT_STORE_MEMORY,
     PARALLEL_VARIANT_ID,
     SEQUENTIAL_VARIANT_ID,
     VARIANTS,
@@ -53,6 +54,9 @@ def _default_args(**overrides):
         "parallel_num_workers": None,
         "parallel_ray_address": None,
         "parallel_log_to_driver": None,
+        "parallel_worker_memory_capacity": None,
+        "parallel_ray_object_store_memory": None,
+        "replay_buffer_type": None,
     }
     values.update(overrides)
     return SimpleNamespace(**values)
@@ -68,6 +72,8 @@ def test_parallel_equivalence_default_config_shape():
     ]
     assert FINAL_EXPLOITABILITY_EQUIVALENCE_MARGIN > 0.0
     assert FINAL_POLICY_VALUE_EQUIVALENCE_MARGIN > 0.0
+    assert config["replay_buffer_type"] == "compact"
+    assert config["parallel_ray_object_store_memory"] == PARALLEL_RAY_OBJECT_STORE_MEMORY
 
 
 def test_parallel_arm_changes_only_execution_metadata():
@@ -103,6 +109,20 @@ def test_parallel_worker_override_only_affects_parallel_arm():
     parallel = _execution_variant_config(config, config["ablation_variants"][1])
     assert sequential["parallel_num_workers"] == 1
     assert parallel["parallel_num_workers"] == 2
+
+
+def test_parallel_memory_controls_are_configurable():
+    config = build_config(
+        _default_args(
+            parallel_worker_memory_capacity=2048,
+            parallel_ray_object_store_memory=268435456,
+            replay_buffer_type="python",
+        )
+    )
+    parallel = _execution_variant_config(config, config["ablation_variants"][1])
+    assert parallel["parallel_worker_memory_capacity"] == 2048
+    assert parallel["parallel_ray_object_store_memory"] == 268435456
+    assert parallel["replay_buffer_type"] == "python"
 
 
 def test_subprocess_isolation_cli_defaults_to_enabled():

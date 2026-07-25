@@ -7,7 +7,13 @@ import random
 import numpy as np
 import pytest
 
-from deep_cfr_poker.replay import AdvantageMemory, ReservoirBuffer, StrategyMemory
+from deep_cfr_poker.replay import (
+    AdvantageMemory,
+    CompactAdvantageReservoirBuffer,
+    CompactStrategyReservoirBuffer,
+    ReservoirBuffer,
+    StrategyMemory,
+)
 
 
 def test_capacity_must_be_positive():
@@ -114,3 +120,72 @@ def test_seeded_runs_are_deterministic():
 def test_namedtuples_have_expected_fields():
     assert AdvantageMemory._fields == ("info_state", "iteration", "advantage")
     assert StrategyMemory._fields == ("info_state", "iteration", "strategy_action_probs")
+
+
+def test_compact_advantage_buffer_samples_records():
+    buf = CompactAdvantageReservoirBuffer(
+        5,
+        info_state_size=3,
+        num_actions=2,
+    )
+    for i in range(8):
+        buf.add(
+            AdvantageMemory(
+                np.array([i, i + 1, i + 2], dtype=np.float32),
+                i,
+                np.array([i, -i], dtype=np.float32),
+            )
+        )
+
+    assert len(buf) == 5
+    assert buf.add_calls == 8
+    samples = buf.sample(3)
+    assert all(isinstance(sample, AdvantageMemory) for sample in samples)
+    assert all(sample.info_state.shape == (3,) for sample in samples)
+    assert all(sample.advantage.shape == (2,) for sample in samples)
+
+
+def test_compact_strategy_buffer_state_round_trip():
+    buf = CompactStrategyReservoirBuffer(
+        4,
+        info_state_size=2,
+        num_actions=3,
+    )
+    for i in range(4):
+        buf.add(
+            StrategyMemory(
+                np.array([i, i + 1], dtype=np.float32),
+                i + 10,
+                np.array([0.2, 0.3, 0.5], dtype=np.float32),
+            )
+        )
+
+    state = buf.state_dict()
+    restored = CompactStrategyReservoirBuffer(
+        1,
+        info_state_size=2,
+        num_actions=3,
+    )
+    restored.load_state_dict(state)
+
+    assert restored.capacity == 4
+    assert restored.add_calls == buf.add_calls
+    assert len(restored) == len(buf)
+    for original, copy in zip(list(buf), list(restored)):
+        np.testing.assert_array_equal(original.info_state, copy.info_state)
+        assert original.iteration == copy.iteration
+        np.testing.assert_array_equal(
+            original.strategy_action_probs,
+            copy.strategy_action_probs,
+        )
+
+
+def test_compact_priority_scores_match_targets():
+    buf = CompactAdvantageReservoirBuffer(
+        3,
+        info_state_size=1,
+        num_actions=2,
+    )
+    buf.add(AdvantageMemory([0.0], 1, np.array([1.0, -3.0], dtype=np.float32)))
+    buf.add(AdvantageMemory([1.0], 1, np.array([2.0, 4.0], dtype=np.float32)))
+    np.testing.assert_allclose(buf.target_abs_mean(), np.array([2.0, 3.0]))

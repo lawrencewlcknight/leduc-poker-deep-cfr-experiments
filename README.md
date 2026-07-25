@@ -354,6 +354,10 @@ Each variant/seed arm is isolated in a subprocess by default, so the experiment
 can be submitted as one Batch job while still releasing replay memory, PyTorch
 allocator state, and Ray actors between independent runs.
 
+This runner now uses compact array-backed replay storage and partitioned
+Ray-worker replay capacity by default, so the parallel backend does not
+multiply the full replay reservoir across every traversal actor.
+
 **Question:** can traversal collection be parallelised without materially changing the learned policy, and does the parallel backend reduce runtime enough to justify using it for larger poker games?
 
 ## Setup

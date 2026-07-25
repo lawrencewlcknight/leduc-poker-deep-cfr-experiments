@@ -111,6 +111,8 @@ class ParallelDeepCFRSolver(DeepCFRSolver):
         parallel_run_seed: int = 0,
         parallel_ray_address: Optional[str] = None,
         parallel_log_to_driver: bool = False,
+        parallel_worker_memory_capacity: Optional[int] = None,
+        parallel_ray_object_store_memory: Optional[int] = None,
         **solver_kwargs,
     ) -> None:
         self._parallel_num_workers = int(parallel_num_workers)
@@ -119,6 +121,20 @@ class ParallelDeepCFRSolver(DeepCFRSolver):
         total_memory_capacity = int(solver_kwargs["memory_capacity"])
         if total_memory_capacity < 1:
             raise ValueError("memory_capacity must be positive.")
+        if parallel_worker_memory_capacity is None:
+            if total_memory_capacity < self._parallel_num_workers:
+                raise ValueError(
+                    "memory_capacity must provide at least one slot per "
+                    "parallel worker."
+                )
+            worker_capacities = partition_total(
+                total_memory_capacity, self._parallel_num_workers
+            )
+        else:
+            worker_capacity = int(parallel_worker_memory_capacity)
+            if worker_capacity < 1:
+                raise ValueError("parallel_worker_memory_capacity must be positive.")
+            worker_capacities = [worker_capacity] * self._parallel_num_workers
 
         super().__init__(game, **solver_kwargs)
         self._game_name = str(game_name)
@@ -142,14 +158,18 @@ class ParallelDeepCFRSolver(DeepCFRSolver):
                     init_kwargs["address"] = str(parallel_ray_address)
                 else:
                     init_kwargs["num_cpus"] = self._parallel_num_workers
+                    object_store_memory = parallel_ray_object_store_memory
+                    if object_store_memory is None:
+                        object_store_memory = 512 * 1024 * 1024
+                    init_kwargs["object_store_memory"] = int(object_store_memory)
                 ray.init(**init_kwargs)
 
             worker_class = ray.remote(num_cpus=1)(DeepCFRTraversalWorker)
-            for worker_index in range(self._parallel_num_workers):
+            for worker_index, worker_capacity in enumerate(worker_capacities):
                 worker_kwargs = dict(solver_kwargs)
                 worker_kwargs.update({
                     "compute_exploitability": False,
-                    "memory_capacity": total_memory_capacity,
+                    "memory_capacity": int(worker_capacity),
                 })
                 self._workers.append(
                     worker_class.remote(

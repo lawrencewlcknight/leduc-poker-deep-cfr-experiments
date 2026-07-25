@@ -32,7 +32,13 @@ from open_spiel.python.algorithms import expected_game_score
 from open_spiel.python.algorithms import exploitability
 
 from .networks import build_network, build_shared_trunk_player_heads
-from .replay import AdvantageMemory, ReservoirBuffer, StrategyMemory
+from .replay import (
+    AdvantageMemory,
+    ReservoirBuffer,
+    StrategyMemory,
+    make_advantage_buffer,
+    make_strategy_buffer,
+)
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -126,6 +132,10 @@ class DeepCFRSolver(policy.Policy):
             replay. ``"uniform"`` preserves the baseline reservoir-buffer
             behaviour; ``"priority_abs_adv"`` samples in proportion to sampled
             regret-target magnitude when minibatching.
+        replay_buffer_type: Replay storage backend. ``"python"`` keeps the
+            original list-of-records reservoir; ``"compact"`` stores fixed-shape
+            replay tensors in contiguous NumPy arrays and materialises records
+            only for sampled minibatches.
         average_strategy_weighting: Average-policy supervised loss weighting.
             ``"linear"`` applies the baseline CFR-style iteration weighting;
             ``"uniform"`` gives all sampled policy-memory rows equal weight.
@@ -163,6 +173,7 @@ class DeepCFRSolver(policy.Policy):
         target_clip_value: float = 1.0,
         target_standardize_epsilon: float = 1e-6,
         advantage_replay_sampling: str = "uniform",
+        replay_buffer_type: str = "python",
         average_strategy_weighting: str = "linear",
         priority_alpha: float = 1.0,
         priority_epsilon: float = 1e-6,
@@ -280,9 +291,15 @@ class DeepCFRSolver(policy.Policy):
         self._policy_gradient_steps = 0
         self._iterations_since_policy_train = 0
         self._policy_network_has_been_trained = False
+        self._replay_buffer_type = str(replay_buffer_type).lower()
 
         # Average-policy network.
-        self._strategy_memories = ReservoirBuffer(memory_capacity)
+        self._strategy_memories = make_strategy_buffer(
+            memory_capacity,
+            self._replay_buffer_type,
+            info_state_size=self._embedding_size,
+            num_actions=self._num_actions,
+        )
         self._policy_network = build_network(
             self._policy_network_type,
             self._embedding_size,
@@ -297,7 +314,13 @@ class DeepCFRSolver(policy.Policy):
 
         # Per-player advantage networks.
         self._advantage_memories = [
-            ReservoirBuffer(memory_capacity) for _ in range(self._num_players)
+            make_advantage_buffer(
+                memory_capacity,
+                self._replay_buffer_type,
+                info_state_size=self._embedding_size,
+                num_actions=self._num_actions,
+            )
+            for _ in range(self._num_players)
         ]
         if self._uses_shared_advantage_trunk:
             self._advantage_networks = build_shared_trunk_player_heads(
@@ -1161,6 +1184,23 @@ class DeepCFRSolver(policy.Policy):
     def _sample_priority_advantage_batch(
         self, player: int, buffer: ReservoirBuffer, batch_size: int
     ) -> List[AdvantageMemory]:
+        if hasattr(buffer, "target_abs_mean") and hasattr(
+            buffer, "sample_with_probabilities"
+        ):
+            raw_scores = buffer.target_abs_mean()
+            priorities = np.power(
+                raw_scores + self._priority_epsilon, self._priority_alpha
+            )
+            total = float(np.sum(priorities))
+            if not np.isfinite(total) or total <= 0.0:
+                probs = np.full(len(buffer), 1.0 / len(buffer), dtype=np.float64)
+            else:
+                probs = priorities / total
+            self._last_advantage_priority_effective_sample_size[player] = float(
+                1.0 / np.sum(probs * probs)
+            )
+            return buffer.sample_with_probabilities(probs, batch_size)
+
         samples = list(buffer)
         probs = self._priority_probabilities(samples)
         self._last_advantage_priority_effective_sample_size[player] = float(
@@ -1309,6 +1349,7 @@ class DeepCFRSolver(policy.Policy):
                 "embedding_size": int(self._embedding_size),
                 "policy_network_type": str(self._policy_network_type),
                 "advantage_network_type": str(self._advantage_network_type),
+                "replay_buffer_type": str(self._replay_buffer_type),
             },
             "training_state": {
                 "nodes_touched": int(self._nodes_touched),

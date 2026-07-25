@@ -131,6 +131,7 @@ def make_solver(game, config) -> DeepCFRSolver:
         "advantage_replay_sampling": str(
             config.get("advantage_replay_sampling", "uniform")
         ),
+        "replay_buffer_type": str(config.get("replay_buffer_type", "python")),
         "average_strategy_weighting": str(
             config.get("average_strategy_weighting", "linear")
         ),
@@ -158,6 +159,16 @@ def make_solver(game, config) -> DeepCFRSolver:
             parallel_run_seed=int(config.get("parallel_run_seed", 0)),
             parallel_ray_address=config.get("parallel_ray_address"),
             parallel_log_to_driver=bool(config.get("parallel_log_to_driver", False)),
+            parallel_worker_memory_capacity=(
+                int(config["parallel_worker_memory_capacity"])
+                if config.get("parallel_worker_memory_capacity") is not None
+                else None
+            ),
+            parallel_ray_object_store_memory=(
+                int(config["parallel_ray_object_store_memory"])
+                if config.get("parallel_ray_object_store_memory") is not None
+                else None
+            ),
             **solver_kwargs,
         )
     raise ValueError(f"Unsupported execution_backend: {execution_backend!r}")
