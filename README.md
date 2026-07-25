@@ -130,7 +130,11 @@ The repository is organised so that each experiment can be run independently whi
 │       │   ├── config.py
 │       │   ├── run.py
 │       │   └── README.md
-│       └── deep_cfr_parallel_equivalence_ablation/ # Experiment 25
+│       ├── deep_cfr_parallel_equivalence_ablation/ # Experiment 25
+│       │   ├── config.py
+│       │   ├── run.py
+│       │   └── README.md
+│       └── deep_cfr_final_candidate_validation/ # Experiment 26
 │           ├── config.py
 │           ├── run.py
 │           └── README.md
@@ -359,6 +363,17 @@ Ray-worker replay capacity by default, so the parallel backend does not
 multiply the full replay reservoir across every traversal actor.
 
 **Question:** can traversal collection be parallelised without materially changing the learned policy, and does the parallel backend reduce runtime enough to justify using it for larger poker games?
+
+### 26. Leduc poker Deep CFR final-candidate validation
+
+[`experiments/leduc_poker/deep_cfr_final_candidate_validation/`](experiments/leduc_poker/deep_cfr_final_candidate_validation/README.md)
+
+Compares the previous best composite Deep CFR baseline with the cumulative
+candidate selected from the targeted training-parameter ablations. The default
+budget is `1050` iterations and `320` traversals, targeting roughly `15M`
+environment nodes touched per variant/seed run.
+
+**Question:** do the selected policy-extraction, advantage-fitting, replay-memory, and learning-rate refinements combine into a better final Leduc Deep CFR configuration than the previous best baseline?
 
 ## Setup
 
@@ -939,6 +954,68 @@ python -m experiments.leduc_poker.deep_cfr_parallel_equivalence_ablation.run \
     --output-root outputs/cloud/smoke-exp25-parallel-equivalence" \
   "n2-standard-4" \
   "3600" \
+  "4000" \
+  "16000"
+
+# Experiment 26 — final candidate validation
+python -m experiments.leduc_poker.deep_cfr_final_candidate_validation.run
+
+# Experiment 26 — local quick smoke test
+python -m experiments.leduc_poker.deep_cfr_final_candidate_validation.run \
+  --seeds 1234 \
+  --iterations 3 \
+  --traversals 4 \
+  --evaluation-interval 1 \
+  --policy-network-train-every 1 \
+  --policy-network-train-steps 1 \
+  --advantage-network-train-steps 1 \
+  --policy-network-layers 8,8 \
+  --advantage-network-layers 8,8 \
+  --batch-size-advantage 2 \
+  --batch-size-strategy 2 \
+  --memory-capacity 256 \
+  --output-root outputs/smoke_tests
+
+# Experiment 26 — GCP Batch quick smoke test
+./gcp/submit_batch_experiment.sh \
+  "smoke-exp26-final-candidate-$(date +%Y%m%d-%H%M%S)" \
+  "python -m experiments.leduc_poker.deep_cfr_final_candidate_validation.run \
+    --seeds 1234 \
+    --iterations 3 \
+    --traversals 4 \
+    --evaluation-interval 1 \
+    --policy-network-train-every 1 \
+    --policy-network-train-steps 1 \
+    --advantage-network-train-steps 1 \
+    --policy-network-layers 8,8 \
+    --advantage-network-layers 8,8 \
+    --batch-size-advantage 2 \
+    --batch-size-strategy 2 \
+    --memory-capacity 256 \
+    --output-root outputs/cloud/smoke-exp26-final-candidate" \
+  "n2-standard-4" \
+  "3600" \
+  "4000" \
+  "16000"
+
+# Experiment 26 — GCP Batch five-seed default run, roughly 15M nodes per run
+./gcp/submit_batch_experiment.sh \
+  "leduc-deep-cfr-exp26-final-candidate-$(date +%Y%m%d-%H%M%S)" \
+  "python -m experiments.leduc_poker.deep_cfr_final_candidate_validation.run \
+    --output-root outputs/cloud/leduc-deep-cfr-exp26-final-candidate" \
+  "n2-standard-4" \
+  "172800" \
+  "4000" \
+  "16000"
+
+# Experiment 26 — GCP Batch ten-seed run, roughly 15M nodes per run
+./gcp/submit_batch_experiment.sh \
+  "leduc-deep-cfr-exp26-final-candidate-10seed-$(date +%Y%m%d-%H%M%S)" \
+  "python -m experiments.leduc_poker.deep_cfr_final_candidate_validation.run \
+    --seeds 1234,2025,31415,27182,16180,4242,8675309,7,99,1001 \
+    --output-root outputs/cloud/leduc-deep-cfr-exp26-final-candidate-10seed" \
+  "n2-standard-4" \
+  "345600" \
   "4000" \
   "16000"
 ```

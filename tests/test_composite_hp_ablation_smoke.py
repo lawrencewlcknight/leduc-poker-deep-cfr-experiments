@@ -50,6 +50,16 @@ from experiments.leduc_poker.deep_cfr_composite_replay_memory_ablation.config im
 from experiments.leduc_poker.deep_cfr_composite_replay_memory_ablation.run import (
     build_config as build_replay_memory_config,
 )
+from experiments.leduc_poker.deep_cfr_final_candidate_validation.config import (
+    DEFAULT_SEEDS as FINAL_CANDIDATE_SEEDS,
+    FINAL_CANDIDATE_VARIANT_ID,
+    FINAL_CANDIDATE_VARIANTS,
+    TARGET_NUM_ITERATIONS,
+    TARGET_NUM_TRAVERSALS,
+)
+from experiments.leduc_poker.deep_cfr_final_candidate_validation.run import (
+    build_config as build_final_candidate_config,
+)
 
 
 def _default_args(**overrides):
@@ -122,6 +132,13 @@ def test_composite_hp_ablation_default_variant_sets():
                 "learning_rate_0_004",
             ],
         ),
+        (
+            build_final_candidate_config,
+            [
+                "composite_best_baseline",
+                FINAL_CANDIDATE_VARIANT_ID,
+            ],
+        ),
     )
     for build_config, expected_ids in cases:
         config = build_config(_default_args())
@@ -139,6 +156,33 @@ def test_composite_hp_ablation_default_seed_sets():
     assert ADVANTAGE_FITTING_SEEDS == [1234, 2025, 31415]
     assert LEARNING_RATE_SEEDS == [1234, 2025, 31415]
     assert REPLAY_MEMORY_SEEDS == [1234, 2025, 31415, 27182, 16180]
+    assert FINAL_CANDIDATE_SEEDS == [1234, 2025, 31415, 27182, 16180]
+
+
+def test_final_candidate_validation_configures_cumulative_candidate():
+    config = build_final_candidate_config(_default_args())
+    assert config["num_iterations"] == TARGET_NUM_ITERATIONS
+    assert config["num_traversals"] == TARGET_NUM_TRAVERSALS
+    assert config["baseline_variant_id"] == BASELINE_VARIANT_ID
+    assert len(config["ablation_variants"]) == 2
+
+    baseline_config = _variant_config(config, FINAL_CANDIDATE_VARIANTS[0])
+    candidate_config = _variant_config(config, FINAL_CANDIDATE_VARIANTS[1])
+    assert baseline_config["variant_id"] == BASELINE_VARIANT_ID
+    assert candidate_config["variant_id"] == FINAL_CANDIDATE_VARIANT_ID
+
+    assert baseline_config["policy_network_train_every"] == 25
+    assert baseline_config["batch_size_advantage"] == 1024
+    assert baseline_config["memory_capacity"] == int(1e7)
+    assert baseline_config["learning_rate"] == 0.003
+
+    assert candidate_config["policy_network_train_every"] == 10
+    assert candidate_config["batch_size_advantage"] == 2048
+    assert candidate_config["memory_capacity"] == int(5e6)
+    assert candidate_config["learning_rate"] == 0.004
+    assert candidate_config["target_processing"] == "standardize"
+    assert candidate_config["advantage_replay_sampling"] == "uniform"
+    assert candidate_config["average_strategy_weighting"] == "uniform"
 
 
 SMOKE_CASES = (
