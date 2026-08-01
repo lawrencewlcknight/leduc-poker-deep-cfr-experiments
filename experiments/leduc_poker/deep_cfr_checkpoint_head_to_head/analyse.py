@@ -15,6 +15,7 @@ same as every other experiment in the repository.
 
 from __future__ import annotations
 
+import csv
 import dataclasses
 import logging
 from collections import defaultdict
@@ -50,6 +51,35 @@ from deep_cfr_poker.snapshots import (
 
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _node_summary_by_checkpoint(run_dir: Path) -> Dict[int, dict]:
+    """Returns mean and SE nodes touched for each saved checkpoint."""
+    path = Path(run_dir) / "training_stage_metrics.csv"
+    if not path.exists():
+        return {}
+    values: Dict[int, List[float]] = defaultdict(list)
+    with open(path, newline="", encoding="utf-8") as handle:
+        for row in csv.DictReader(handle):
+            checkpoint = row.get("checkpoint_iteration", row.get("target_iteration"))
+            nodes = row.get("nodes_touched", row.get("nodes_touched_total"))
+            if checkpoint in (None, "") or nodes in (None, ""):
+                continue
+            values[int(checkpoint)].append(float(nodes))
+
+    summaries: Dict[int, dict] = {}
+    for checkpoint, checkpoint_values in values.items():
+        arr = np.asarray(checkpoint_values, dtype=np.float64)
+        summaries[checkpoint] = {
+            "nodes_touched_mean": float(np.mean(arr)),
+            "nodes_touched_sem": (
+                float(np.std(arr, ddof=1) / np.sqrt(arr.size))
+                if arr.size > 1
+                else 0.0
+            ),
+            "nodes_touched_n": int(arr.size),
+        }
+    return summaries
 
 
 def _load_policies(
@@ -201,6 +231,13 @@ def run_analysis(
         snapshot_records,
         allowed_iterations=tuple(config["checkpoint_schedule"]),  # type: ignore[arg-type]
     )
+    if bool(config.get("require_complete_checkpoint_schedule", False)):
+        required = {int(value) for value in config["checkpoint_schedule"]}
+        policies_by_seed = {
+            seed: policies
+            for seed, policies in policies_by_seed.items()
+            if set(policies) == required
+        }
     if not policies_by_seed:
         raise RuntimeError(
             "Snapshot inventory is non-empty but no policies were loaded — "
@@ -287,6 +324,7 @@ def run_analysis(
     write_dict_rows_csv(strength_dict_rows, strength_csv)
 
     aggregate_rows = aggregate_strength(strength_rows)
+    node_summaries = _node_summary_by_checkpoint(run_dir)
     # Add aggregated policy-quality columns for convenience.
     expl_lookup: Dict[int, List[float]] = defaultdict(list)
     avg_value_lookup: Dict[int, List[float]] = defaultdict(list)
@@ -297,6 +335,7 @@ def run_analysis(
             avg_value_lookup[m.checkpoint].append(m.average_policy_value)
     for row in aggregate_rows:
         ckpt = int(row["checkpoint"])
+        row.update(node_summaries.get(ckpt, {}))
         values = np.asarray(expl_lookup.get(ckpt, []), dtype=np.float64)
         row["exploitability_mean"] = (
             float(np.mean(values)) if values.size else float("nan")
@@ -355,15 +394,31 @@ def run_analysis(
 
     # ---------------- plots ----------------
     annotate = bool(config.get("annotate_heatmap", True))
+    use_nodes = str(config.get("temporal_x_axis", "checkpoint")) == "nodes_touched"
+    if use_nodes:
+        checkpoint_labels = [
+            f"{node_summaries[i]['nodes_touched_mean'] / 1e6:.1f}M"
+            if i in node_summaries
+            else str(i)
+            for i in sorted_iterations
+        ]
+        heatmap_xlabel = "Policy checkpoint B (nodes touched)"
+        heatmap_ylabel = "Policy checkpoint A (nodes touched)"
+    else:
+        checkpoint_labels = list(sorted_iterations)
+        heatmap_xlabel = "Checkpoint B iteration"
+        heatmap_ylabel = "Checkpoint A iteration"
     plot_pairwise_heatmap(
         mean_matrix,
-        sorted_iterations,
-        sorted_iterations,
+        checkpoint_labels,
+        checkpoint_labels,
         output_path=run_dir / "head_to_head_mean_matrix.png",
         title=(
             "Mean exact head-to-head EV across seeds\n"
             "Positive means row checkpoint beats column checkpoint"
         ),
+        xlabel=heatmap_xlabel,
+        ylabel=heatmap_ylabel,
         annotate=annotate,
     )
 
@@ -374,33 +429,62 @@ def run_analysis(
                 later_vs_earlier[r_idx, c_idx] = np.nan
     plot_pairwise_heatmap(
         later_vs_earlier,
-        sorted_iterations,
-        sorted_iterations,
+        checkpoint_labels,
+        checkpoint_labels,
         output_path=run_dir / "head_to_head_later_vs_earlier.png",
         title=(
             "Later-vs-earlier checkpoint EV only\n"
-            "Positive cells support monotonic practical improvement"
+            "Positive cells indicate higher exact EV for the later policy"
+        ),
+        xlabel=(
+            "Earlier policy checkpoint (nodes touched)"
+            if use_nodes
+            else "Earlier checkpoint iteration"
+        ),
+        ylabel=(
+            "Later policy checkpoint (nodes touched)"
+            if use_nodes
+            else "Later checkpoint iteration"
         ),
         annotate=annotate,
     )
 
     plot_pairwise_heatmap(
         win_fraction_matrix,
-        sorted_iterations,
-        sorted_iterations,
+        checkpoint_labels,
+        checkpoint_labels,
         output_path=run_dir / "head_to_head_seed_win_fraction.png",
         title="Fraction of seeds where checkpoint A clearly beats checkpoint B",
         cmap="viridis",
         vmin=0.0,
         vmax=1.0,
         colorbar_label="Fraction of seeds where A beats B",
+        xlabel=heatmap_xlabel,
+        ylabel=heatmap_ylabel,
         annotate=annotate,
     )
 
     aggregate_lookup = {int(row["checkpoint"]): row for row in aggregate_rows}
     iterations_for_plot = list(sorted_iterations)
+    if use_nodes:
+        x_for_plot = [
+            aggregate_lookup[i].get("nodes_touched_mean", float("nan"))
+            for i in iterations_for_plot
+        ]
+        temporal_xlabel = "Nodes Touched"
+        strength_earlier_filename = "head_to_head_strength_vs_earlier_by_nodes.png"
+        strength_previous_filename = "head_to_head_strength_vs_previous_by_nodes.png"
+        exploitability_filename = "exploitability_by_nodes.png"
+        average_value_filename = "average_policy_value_by_nodes.png"
+    else:
+        x_for_plot = iterations_for_plot
+        temporal_xlabel = "Checkpoint iteration"
+        strength_earlier_filename = "head_to_head_strength_vs_earlier.png"
+        strength_previous_filename = "head_to_head_strength_vs_previous.png"
+        exploitability_filename = "exploitability_by_checkpoint.png"
+        average_value_filename = "average_policy_value_by_checkpoint.png"
     plot_strength_curve_with_errorbars(
-        iterations_for_plot,
+        x_for_plot,
         [
             aggregate_lookup[i].get("mean_EV_vs_earlier_checkpoints_mean", float("nan"))
             for i in iterations_for_plot
@@ -409,13 +493,13 @@ def run_analysis(
             aggregate_lookup[i].get("mean_EV_vs_earlier_checkpoints_sem", float("nan"))
             for i in iterations_for_plot
         ],
-        output_path=run_dir / "head_to_head_strength_vs_earlier.png",
+        output_path=run_dir / strength_earlier_filename,
         title="Does later training improve head-to-head performance?",
-        xlabel="Checkpoint iteration",
+        xlabel=temporal_xlabel,
         ylabel="Mean EV vs earlier checkpoints",
     )
     plot_strength_curve_with_errorbars(
-        iterations_for_plot,
+        x_for_plot,
         [
             aggregate_lookup[i].get("EV_vs_previous_checkpoint_mean", float("nan"))
             for i in iterations_for_plot
@@ -424,23 +508,23 @@ def run_analysis(
             aggregate_lookup[i].get("EV_vs_previous_checkpoint_sem", float("nan"))
             for i in iterations_for_plot
         ],
-        output_path=run_dir / "head_to_head_strength_vs_previous.png",
+        output_path=run_dir / strength_previous_filename,
         title="Adjacent-checkpoint improvement",
-        xlabel="Checkpoint iteration",
+        xlabel=temporal_xlabel,
         ylabel="EV vs immediately previous checkpoint",
     )
     plot_strength_curve_with_errorbars(
-        iterations_for_plot,
+        x_for_plot,
         [aggregate_lookup[i].get("exploitability_mean", float("nan")) for i in iterations_for_plot],
         [aggregate_lookup[i].get("exploitability_sem", float("nan")) for i in iterations_for_plot],
-        output_path=run_dir / "exploitability_by_checkpoint.png",
+        output_path=run_dir / exploitability_filename,
         title="Checkpoint exploitability over training",
-        xlabel="Checkpoint iteration",
+        xlabel=temporal_xlabel,
         ylabel="Exploitability",
         reference_line_label="Nash equilibrium target",
     )
     plot_strength_curve_with_errorbars(
-        iterations_for_plot,
+        x_for_plot,
         [
             aggregate_lookup[i].get("average_policy_value_mean", float("nan"))
             for i in iterations_for_plot
@@ -449,9 +533,9 @@ def run_analysis(
             aggregate_lookup[i].get("average_policy_value_sem", float("nan"))
             for i in iterations_for_plot
         ],
-        output_path=run_dir / "average_policy_value_by_checkpoint.png",
+        output_path=run_dir / average_value_filename,
         title="Checkpoint average policy value over training",
-        xlabel="Checkpoint iteration",
+        xlabel=temporal_xlabel,
         ylabel="Average policy value for player 0",
         reference_line_value=float(config.get("average_policy_value_target", -0.085606424078)),
         reference_line_label="Player 0 Nash value",

@@ -132,6 +132,33 @@ def test_solve_returns_dataclass_and_runs_end_to_end(leduc_game):
         assert len(result.diagnostics[key]) == expected_len
 
 
+def test_solve_post_iteration_callback_observes_straight_through_training(leduc_game):
+    solver = _build_solver(
+        leduc_game,
+        num_iterations=4,
+        policy_network_train_every=2,
+        evaluation_interval=4,
+    )
+    observed = []
+
+    def record_state(active_solver, completed_iteration):
+        observed.append(
+            (
+                completed_iteration,
+                active_solver._iteration,
+                active_solver._policy_training_events,
+                active_solver._nodes_touched,
+            )
+        )
+
+    solver.solve(post_iteration_callback=record_state)
+
+    assert [row[0] for row in observed] == [1, 2, 3, 4]
+    assert [row[1] for row in observed] == [2, 3, 4, 5]
+    assert [row[2] for row in observed] == [0, 1, 1, 2]
+    assert all(later[3] > earlier[3] for earlier, later in zip(observed, observed[1:]))
+
+
 def test_final_only_policy_training_marks_intermediate_metrics_missing(leduc_game):
     solver = _build_solver(
         leduc_game,

@@ -134,8 +134,15 @@ The repository is organised so that each experiment can be run independently whi
 │       │   ├── config.py
 │       │   ├── run.py
 │       │   └── README.md
-│       └── deep_cfr_final_candidate_validation/ # Experiment 26
+│       ├── deep_cfr_final_candidate_validation/ # Experiment 26
+│       │   ├── config.py
+│       │   ├── run.py
+│       │   └── README.md
+│       └── deep_cfr_final_candidate_checkpoint_head_to_head/ # Experiment 27
 │           ├── config.py
+│           ├── train.py
+│           ├── analyse.py
+│           ├── statistics.py
 │           ├── run.py
 │           └── README.md
 ├── tests/                                            # pytest suite
@@ -374,6 +381,19 @@ budget is `1050` iterations and `320` traversals, targeting roughly `15M`
 environment nodes touched per variant/seed run.
 
 **Question:** do the selected policy-extraction, advantage-fitting, replay-memory, and learning-rate refinements combine into a better final Leduc Deep CFR configuration than the previous best baseline?
+
+### 27. Leduc poker Deep CFR final-candidate checkpoint head-to-head
+
+[`experiments/leduc_poker/deep_cfr_final_candidate_checkpoint_head_to_head/`](experiments/leduc_poker/deep_cfr_final_candidate_checkpoint_head_to_head/README.md)
+
+Trains one uninterrupted instance of the final candidate over approximately
+`15M` nodes for each of five fixed seeds. Five lightweight average-policy
+snapshots are captured at approximately `3M`, `6M`, `9M`, `12M`, and `15M`
+nodes, then evaluated in every within-seed pairing using exact, seat-averaged
+OpenSpiel expected value. Statistical inference is performed at seed level;
+the ten within-seed checkpoint pairings are not treated as independent data.
+
+**Question:** does progressively lower exploitability in the final Deep CFR candidate correspond to statistically consistent improvement in direct head-to-head play?
 
 ## Setup
 
@@ -1016,6 +1036,59 @@ python -m experiments.leduc_poker.deep_cfr_final_candidate_validation.run \
     --output-root outputs/cloud/leduc-deep-cfr-exp26-final-candidate-10seed" \
   "n2-standard-4" \
   "345600" \
+  "4000" \
+  "16000"
+
+# Experiment 27 — final-candidate checkpoint head-to-head
+python -m experiments.leduc_poker.deep_cfr_final_candidate_checkpoint_head_to_head.run
+
+# Experiment 27 — local quick smoke test
+python -m experiments.leduc_poker.deep_cfr_final_candidate_checkpoint_head_to_head.run \
+  --seeds 1234 \
+  --iterations 10 \
+  --checkpoint-schedule 2,4,6,8,10 \
+  --traversals 4 \
+  --evaluation-interval 2 \
+  --policy-network-train-every 2 \
+  --policy-network-train-steps 1 \
+  --advantage-network-train-steps 1 \
+  --policy-network-layers 8,8 \
+  --advantage-network-layers 8,8 \
+  --batch-size-advantage 2 \
+  --batch-size-strategy 2 \
+  --memory-capacity 256 \
+  --output-root outputs/smoke_tests
+
+# Experiment 27 — GCP Batch quick smoke test
+./gcp/submit_batch_experiment.sh \
+  "smoke-exp27-final-checkpoint-h2h-$(date +%Y%m%d-%H%M%S)" \
+  "python -m experiments.leduc_poker.deep_cfr_final_candidate_checkpoint_head_to_head.run \
+    --seeds 1234 \
+    --iterations 10 \
+    --checkpoint-schedule 2,4,6,8,10 \
+    --traversals 4 \
+    --evaluation-interval 2 \
+    --policy-network-train-every 2 \
+    --policy-network-train-steps 1 \
+    --advantage-network-train-steps 1 \
+    --policy-network-layers 8,8 \
+    --advantage-network-layers 8,8 \
+    --batch-size-advantage 2 \
+    --batch-size-strategy 2 \
+    --memory-capacity 256 \
+    --output-root outputs/cloud/smoke-exp27-final-checkpoint-h2h" \
+  "n2-standard-4" \
+  "3600" \
+  "4000" \
+  "16000"
+
+# Experiment 27 — GCP Batch five-seed full run, roughly 15M nodes per seed
+./gcp/submit_batch_experiment.sh \
+  "leduc-deep-cfr-exp27-final-checkpoint-h2h-$(date +%Y%m%d-%H%M%S)" \
+  "python -m experiments.leduc_poker.deep_cfr_final_candidate_checkpoint_head_to_head.run \
+    --output-root outputs/cloud/leduc-deep-cfr-exp27-final-checkpoint-h2h" \
+  "n2-standard-4" \
+  "172800" \
   "4000" \
   "16000"
 ```

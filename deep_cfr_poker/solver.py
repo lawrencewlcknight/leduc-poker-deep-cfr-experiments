@@ -19,7 +19,7 @@ import os
 import random
 import time
 from dataclasses import dataclass, field
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch
@@ -509,8 +509,20 @@ class DeepCFRSolver(policy.Policy):
 
     # ---------------------------------------------------------------- training
 
-    def solve(self) -> SolveResult:
-        """Runs one fixed-budget Deep CFR training phase."""
+    def solve(
+        self,
+        post_iteration_callback: Optional[
+            Callable[["DeepCFRSolver", int], None]
+        ] = None,
+    ) -> SolveResult:
+        """Runs one fixed-budget Deep CFR training phase.
+
+        ``post_iteration_callback``, when supplied, is called after the policy
+        training decision for each completed CFR iteration and receives the
+        solver plus its global completed-iteration count. This permits
+        lightweight observation or snapshotting without splitting one training
+        trajectory into multiple calls to :meth:`solve`.
+        """
         start_time = time.perf_counter()
         advantage_losses: Dict[int, List[float]] = collections.defaultdict(list)
         policy_losses_at_checkpoints: List[Optional[float]] = []
@@ -584,6 +596,9 @@ class DeepCFRSolver(policy.Policy):
                     self._policy_network_has_been_trained = True
             else:
                 self._iterations_since_policy_train += 1
+
+            if post_iteration_callback is not None:
+                post_iteration_callback(self, int(self._iteration - 1))
 
             if not evaluate_now:
                 continue
