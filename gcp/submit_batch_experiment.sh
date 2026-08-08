@@ -17,19 +17,41 @@ export DEBIAN_FRONTEND=noninteractive
 #   n2-standard-4: CPU_MILLI=4000 MEMORY_MIB=16000
 #   n2-standard-8: CPU_MILLI=8000 MEMORY_MIB=32000
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "${REPO_ROOT}"
+
 JOB_NAME="$1"
 EXPERIMENT_COMMAND="$2"
 MACHINE_TYPE="${3:-n2-standard-4}"
 MAX_RUN_SECONDS="${4:-21600}"
 CPU_MILLI="${5:-4000}"
 MEMORY_MIB="${6:-16000}"
+REPO_URL="${REPO_URL:-https://github.com/lawrencewlcknight/leduc-poker-deep-cfr-experiments.git}"
+REPO_REF="${REPO_REF:-main}"
 
 : "${PROJECT_ID:?Set PROJECT_ID first}"
 : "${REGION:?Set REGION first}"
 : "${BUCKET:?Set BUCKET first}"
 : "${SA_EMAIL:?Set SA_EMAIL first}"
 
-JOB_JSON="$(mktemp "/tmp/${JOB_NAME}.XXXXXX.json")"
+# Catch accidental use of another poker repository's similarly named Batch
+# wrapper before provisioning a VM.
+EXPECTED_MODULE="$(
+  printf '%s\n' "${EXPERIMENT_COMMAND}" |
+    sed -nE 's/.*python(3)?[[:space:]]+-m[[:space:]]+([A-Za-z0-9_.]+).*/\2/p' |
+    head -n 1
+)"
+if [[ -n "${EXPECTED_MODULE}" ]]; then
+  EXPECTED_MODULE_PATH="${EXPECTED_MODULE//.//}"
+  if [[ ! -f "${EXPECTED_MODULE_PATH}.py" && ! -f "${EXPECTED_MODULE_PATH}/__init__.py" ]]; then
+    echo "Refusing to submit: module ${EXPECTED_MODULE} is absent from ${REPO_ROOT}." >&2
+    echo "Run the launcher from the Leduc Deep CFR repository." >&2
+    exit 64
+  fi
+fi
+
+JOB_JSON="$(mktemp "/tmp/${JOB_NAME}.XXXXXX")"
 
 export JOB_NAME
 export EXPERIMENT_COMMAND
@@ -40,10 +62,14 @@ export MEMORY_MIB
 export BUCKET
 export SA_EMAIL
 export JOB_JSON
+export REPO_URL
+export REPO_REF
+export EXPECTED_MODULE
 
 python3 <<'PY'
 import json
 import os
+import shlex
 
 job_json_path = os.environ["JOB_JSON"]
 job_name = os.environ["JOB_NAME"]
@@ -54,6 +80,11 @@ cpu_milli = int(os.environ["CPU_MILLI"])
 memory_mib = int(os.environ["MEMORY_MIB"])
 bucket = os.environ["BUCKET"]
 service_account = os.environ["SA_EMAIL"]
+repo_url = os.environ["REPO_URL"]
+repo_ref = os.environ["REPO_REF"]
+expected_module = os.environ.get("EXPECTED_MODULE", "")
+repo_url_q = shlex.quote(repo_url)
+repo_ref_q = shlex.quote(repo_ref)
 
 script = f"""#!/usr/bin/env bash
 set -euxo pipefail
@@ -78,8 +109,21 @@ WORKDIR=/workspace
 mkdir -p "$WORKDIR"
 cd "$WORKDIR"
 
-git clone --depth 1 https://github.com/lawrencewlcknight/leduc-poker-deep-cfr-experiments.git
-cd leduc-poker-deep-cfr-experiments
+git clone --depth 1 --branch {repo_ref_q} {repo_url_q} source-repo
+cd source-repo
+
+echo "Repository source: {repo_url}"
+echo "Requested repository ref: {repo_ref}"
+echo "Resolved repository commit: $(git rev-parse HEAD)"
+
+EXPECTED_MODULE={shlex.quote(expected_module)}
+if [ -n "$EXPECTED_MODULE" ]; then
+  EXPECTED_MODULE_PATH="${{EXPECTED_MODULE//.//}}"
+  if [ ! -f "$EXPECTED_MODULE_PATH.py" ] && [ ! -f "$EXPECTED_MODULE_PATH/__init__.py" ]; then
+    echo "Requested module $EXPECTED_MODULE is absent from $(pwd)." >&2
+    exit 64
+  fi
+fi
 
 export HOME="${{HOME:-/root}}"
 export TMPDIR="/tmp"
@@ -101,6 +145,12 @@ python3 -m venv --copies /tmp/leduc-venv
 source /tmp/leduc-venv/bin/activate
 
 python -m pip install --upgrade pip setuptools wheel
+# Batch jobs launched by this wrapper use CPU-only n2 machines. Installing the
+# CPU wheels first prevents PyPI's Linux Torch package from pulling CUDA
+# runtimes that cannot be used and consume several gigabytes of disk.
+python -m pip install --no-cache-dir \
+  --index-url https://download.pytorch.org/whl/cpu \
+  "torch>=2.0,<3.0" "torchvision>=0.15,<1.0"
 python -m pip install --no-cache-dir --no-build-isolation -r requirements.txt
 python -m pip install --no-cache-dir --no-build-isolation -e .
 python -m pip install --no-cache-dir "google-cloud-storage>=2.16,<4.0"

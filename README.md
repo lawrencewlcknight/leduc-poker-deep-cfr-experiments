@@ -955,27 +955,9 @@ python -m experiments.leduc_poker.deep_cfr_parallel_equivalence_ablation.run \
   --output-root outputs/smoke_tests
 
 # Experiment 25 — GCP Batch quick smoke test
-./gcp/submit_batch_experiment.sh \
-  "smoke-exp25-parallel-equivalence-$(date +%Y%m%d-%H%M%S)" \
-  "python -m experiments.leduc_poker.deep_cfr_parallel_equivalence_ablation.run \
-    --seeds 1234 \
-    --iterations 3 \
-    --traversals 4 \
-    --evaluation-interval 1 \
-    --policy-network-train-every 1 \
-    --policy-network-train-steps 1 \
-    --advantage-network-train-steps 1 \
-    --policy-network-layers 8,8 \
-    --advantage-network-layers 8,8 \
-    --batch-size-advantage 2 \
-    --batch-size-strategy 2 \
-    --memory-capacity 256 \
-    --parallel-num-workers 2 \
-    --output-root outputs/cloud/smoke-exp25-parallel-equivalence" \
-  "n2-standard-4" \
-  "3600" \
-  "4000" \
-  "16000"
+# This dedicated launcher verifies the Leduc repository and module locally and
+# again on the Batch VM before starting the experiment.
+./gcp/submit_exp25_smoke.sh
 
 # Experiment 26 — final candidate validation
 python -m experiments.leduc_poker.deep_cfr_final_candidate_validation.run
