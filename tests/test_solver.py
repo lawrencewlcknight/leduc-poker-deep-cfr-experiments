@@ -178,6 +178,38 @@ def test_solve_post_player_update_callback_is_phase_accurate(leduc_game):
     ]
 
 
+def test_fresh_advantage_optimizer_retains_previous_network_weights(
+    monkeypatch, leduc_game
+):
+    solver = _build_solver(
+        leduc_game,
+        num_iterations=2,
+        num_traversals=2,
+        reset_advantage_optimizer_each_iteration=True,
+    )
+    original_reset = solver.reset_advantage_optimizer
+    reset_calls = []
+
+    def record_reset(player):
+        before = [
+            parameter.detach().clone()
+            for parameter in solver._advantage_networks[player].parameters()
+        ]
+        previous_optimizer = solver._optimizer_advantages[player]
+        original_reset(player)
+        current_optimizer = solver._optimizer_advantages[player]
+        after = list(solver._advantage_networks[player].parameters())
+        reset_calls.append((player, previous_optimizer, current_optimizer))
+        assert current_optimizer is not previous_optimizer
+        assert not current_optimizer.state
+        assert all(torch.equal(left, right) for left, right in zip(before, after))
+
+    monkeypatch.setattr(solver, "reset_advantage_optimizer", record_reset)
+    solver.solve()
+
+    assert [player for player, _, _ in reset_calls] == [0, 1, 0, 1]
+
+
 def test_disabled_policy_mode_runs_advantage_learning_without_strategy_replay(
     leduc_game,
 ):

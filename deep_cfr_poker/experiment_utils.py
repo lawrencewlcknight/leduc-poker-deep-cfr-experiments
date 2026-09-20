@@ -120,6 +120,9 @@ def make_solver(game, config) -> DeepCFRSolver:
         "reinitialize_advantage_networks": bool(
             config["reinitialize_advantage_networks"]
         ),
+        "reset_advantage_optimizer_each_iteration": bool(
+            config.get("reset_advantage_optimizer_each_iteration", False)
+        ),
         "policy_network_train_steps": int(config["policy_network_train_steps"]),
         "advantage_network_train_steps": int(config["advantage_network_train_steps"]),
         "compute_exploitability": bool(config["compute_exploitability"]),

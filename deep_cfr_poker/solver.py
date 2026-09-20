@@ -123,6 +123,11 @@ class DeepCFRSolver(policy.Policy):
             re-initialise the advantage network from scratch before each
             training session. If False, training continues from the previous
             iteration's weights.
+        reset_advantage_optimizer_each_iteration: If True, retain the previous
+            network weights but create a fresh Adam optimiser immediately
+            before each player's advantage-network fitting session. This
+            matches the previous-weights/new-fit treatment used by the
+            paper-aligned SD-CFR experiment.
         compute_exploitability: If True, compute exact NashConv at each policy
             checkpoint. False is much cheaper on larger games where it would
             otherwise dominate wall-clock.
@@ -175,6 +180,7 @@ class DeepCFRSolver(policy.Policy):
         collect_strategy_replay: bool = True,
         advantage_network_train_steps: int = 1,
         reinitialize_advantage_networks: bool = True,
+        reset_advantage_optimizer_each_iteration: bool = False,
         compute_exploitability: bool = False,
         target_processing: str = "none",
         target_clip_value: float = 1.0,
@@ -231,6 +237,9 @@ class DeepCFRSolver(policy.Policy):
         self._num_iterations = int(num_iterations)
         self._num_traversals = int(num_traversals)
         self._reinitialize_advantage_networks = bool(reinitialize_advantage_networks)
+        self._reset_advantage_optimizer_each_iteration = bool(
+            reset_advantage_optimizer_each_iteration
+        )
         self._num_actions = game.num_distinct_actions()
         self._iteration = 1
         self._initial_learning_rate = float(learning_rate)
@@ -425,6 +434,29 @@ class DeepCFRSolver(policy.Policy):
                 net.reset()
         self._optimizer_advantages = self._make_advantage_optimizers()
 
+    def reset_advantage_optimizer(self, player: int) -> None:
+        """Resets Adam state for one fit while preserving network weights.
+
+        For ordinary per-player networks only the selected player's optimiser
+        is replaced. Shared-trunk architectures necessarily use one optimiser
+        across all player heads, so resetting either player replaces the
+        shared optimiser for every player reference.
+        """
+        player = int(player)
+        if player < 0 or player >= self._num_players:
+            raise ValueError(f"Invalid player index: {player}")
+        if self._uses_shared_advantage_trunk:
+            shared_optimizer = torch.optim.Adam(
+                self._unique_advantage_parameters(), lr=self._learning_rate
+            )
+            self._optimizer_advantages = [
+                shared_optimizer for _ in range(self._num_players)
+            ]
+            return
+        self._optimizer_advantages[player] = torch.optim.Adam(
+            self._advantage_networks[player].parameters(), lr=self._learning_rate
+        )
+
     def _unique_advantage_parameters(self) -> List[torch.nn.Parameter]:
         seen = set()
         params = []
@@ -585,6 +617,9 @@ class DeepCFRSolver(policy.Policy):
                     and not self._uses_shared_advantage_trunk
                 ):
                     self.reinitialize_advantage_network(p)
+
+                if self._reset_advantage_optimizer_each_iteration:
+                    self.reset_advantage_optimizer(p)
 
                 advantage_losses[p].append(self._learn_advantage_network(p))
                 if post_player_update_callback is not None:
@@ -1406,6 +1441,9 @@ class DeepCFRSolver(policy.Policy):
                 "policy_network_type": str(self._policy_network_type),
                 "advantage_network_type": str(self._advantage_network_type),
                 "replay_buffer_type": str(self._replay_buffer_type),
+                "reset_advantage_optimizer_each_iteration": bool(
+                    self._reset_advantage_optimizer_each_iteration
+                ),
             },
             "training_state": {
                 "nodes_touched": int(self._nodes_touched),

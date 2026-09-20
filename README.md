@@ -149,7 +149,12 @@ The repository is organised so that each experiment can be run independently whi
 │           ├── config.py
 │           ├── run.py
 │           └── README.md
-│       └── single_deep_cfr_uniform_36h_trajectory/  # Experiment 29
+│       ├── single_deep_cfr_uniform_36h_trajectory/  # Experiment 29
+│           ├── config.py
+│           ├── run.py
+│           ├── cloud.py
+│           └── README.md
+│       └── single_deep_cfr_paper_aligned_36h_trajectory/ # Experiment 30
 │           ├── config.py
 │           ├── run.py
 │           ├── cloud.py
@@ -437,6 +442,22 @@ uniform and canonical linear weighting.
 **Question:** does the selected uniformly weighted SD-CFR candidate continue
 to improve over 36 hours, and is its long-horizon behaviour stable across
 seeds when measured against active time and nodes touched?
+
+### 30. Paper-aligned SD-CFR five-seed 36-hour trajectory
+
+[`experiments/leduc_poker/single_deep_cfr_paper_aligned_36h_trajectory/`](experiments/leduc_poker/single_deep_cfr_paper_aligned_36h_trajectory/README.md)
+
+Starts from Experiment 29 and changes only four registered aspects of the
+advantage learner: 1,500 external-sampling traversals per player and
+iteration, 750 advantage-network updates per fitting session, learning rate
+0.001, and a fresh Adam optimiser for each fitting session while retaining
+the previous same-player network weights. Five seeds train independently for
+36 active hours and use the same deferred exact uniform- and linear-SD-CFR
+evaluation pipeline as Experiment 29.
+
+**Question:** does the more paper-aligned data and fitting budget improve the
+long-horizon exploitability, stability, and compute-normalised convergence of
+the selected SD-CFR candidate?
 
 ## Setup
 
@@ -1165,6 +1186,23 @@ export PARALLELISM=5
 
 # Reuse the same RUN_ID to recover failed stages without repeating completed ones
 ./gcp/run_single_deep_cfr_uniform_36h_trajectory.sh resume
+
+# Experiment 30 — paper-aligned SD-CFR, five parallel 36-hour seeds
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="exp30-paper-sdcfr36h-$(date -u '+%Y%m%d-%H%M%S')"
+export PARALLELISM=5
+
+# Mandatory local end-to-end smoke test
+./gcp/run_single_deep_cfr_paper_aligned_36h_trajectory.sh smoke-local
+
+# Remote controller: cloud smoke -> train -> deferred evaluation -> aggregate
+./gcp/run_single_deep_cfr_paper_aligned_36h_trajectory.sh run
+
+# The laptop may be disconnected after submission
+./gcp/run_single_deep_cfr_paper_aligned_36h_trajectory.sh status
+
+# Reuse the same RUN_ID to recover failed stages without repeating completed ones
+./gcp/run_single_deep_cfr_paper_aligned_36h_trajectory.sh resume
 ```
 
 Each CLI exposes overrides for the most commonly varied configuration values. See `--help` for the per-experiment flag list, and the experiment's own README for the full output catalogue.
