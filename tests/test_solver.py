@@ -178,6 +178,55 @@ def test_solve_post_player_update_callback_is_phase_accurate(leduc_game):
     ]
 
 
+def test_disabled_policy_mode_runs_advantage_learning_without_strategy_replay(
+    leduc_game,
+):
+    solver = _build_solver(
+        leduc_game,
+        num_iterations=3,
+        policy_training_mode="disabled",
+        collect_strategy_replay=False,
+        evaluation_interval=10_000,
+    )
+    observed = []
+    solver.solve(post_iteration_callback=lambda _solver, iteration: observed.append(iteration))
+
+    assert observed == [1, 2, 3]
+    assert solver._policy_training_events == 0
+    assert solver._policy_gradient_steps == 0
+    assert len(solver._strategy_memories) == 0
+    assert all(len(memory) > 0 for memory in solver._advantage_memories)
+
+
+def test_active_time_budget_stops_only_after_a_complete_iteration(leduc_game):
+    solver = _build_solver(
+        leduc_game,
+        num_iterations=10_000,
+        policy_training_mode="disabled",
+        collect_strategy_replay=False,
+        evaluation_interval=10_000,
+    )
+    player_updates = []
+    completed = []
+    solver.solve(
+        post_player_update_callback=lambda _solver, player, iteration: player_updates.append(
+            (player, iteration)
+        ),
+        post_iteration_callback=lambda _solver, iteration: completed.append(iteration),
+        max_training_seconds=0.001,
+    )
+
+    assert completed
+    assert len(player_updates) == 2 * len(completed)
+    assert player_updates[-2:] == [(0, completed[-1]), (1, completed[-1])]
+
+
+def test_active_time_budget_must_be_positive(leduc_game):
+    solver = _build_solver(leduc_game)
+    with pytest.raises(ValueError, match="max_training_seconds must be positive"):
+        solver.solve(max_training_seconds=0.0)
+
+
 def test_final_only_policy_training_marks_intermediate_metrics_missing(leduc_game):
     solver = _build_solver(
         leduc_game,

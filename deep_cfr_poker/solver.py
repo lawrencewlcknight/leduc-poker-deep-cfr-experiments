@@ -105,9 +105,15 @@ class DeepCFRSolver(policy.Policy):
         evaluation_interval: Evaluate exploitability and diagnostics every this
             many iterations. Defaults to ``policy_network_train_every`` for
             backwards-compatible checkpoint behaviour.
-        policy_training_mode: Either ``"intermittent"`` or ``"final_only"``.
-            Final-only mode trains the average-policy network once after CFR
-            data collection finishes.
+        policy_training_mode: ``"intermittent"``, ``"final_only"``, or
+            ``"disabled"``. Final-only mode trains the average-policy network
+            once after CFR data collection finishes. Disabled mode is for
+            standalone SD-CFR, whose deployed strategy is the archive of
+            historical advantage networks and therefore has no separately
+            fitted average-policy network.
+        collect_strategy_replay: Whether opponent strategy observations are
+            stored for average-policy fitting. Standalone SD-CFR can disable
+            this without changing its advantage-learning rule.
         final_policy_network_train_steps: Number of policy-gradient steps for
             the final extraction in final-only mode. Defaults to
             ``policy_network_train_steps``.
@@ -166,6 +172,7 @@ class DeepCFRSolver(policy.Policy):
         evaluation_interval: Optional[int] = None,
         policy_training_mode: str = "intermittent",
         final_policy_network_train_steps: Optional[int] = None,
+        collect_strategy_replay: bool = True,
         advantage_network_train_steps: int = 1,
         reinitialize_advantage_networks: bool = True,
         compute_exploitability: bool = False,
@@ -189,9 +196,10 @@ class DeepCFRSolver(policy.Policy):
             evaluation_interval = policy_network_train_every
         if int(evaluation_interval) < 1:
             raise ValueError("evaluation_interval must be >= 1")
-        if policy_training_mode not in {"intermittent", "final_only"}:
+        if policy_training_mode not in {"intermittent", "final_only", "disabled"}:
             raise ValueError(
-                "policy_training_mode must be either 'intermittent' or 'final_only'"
+                "policy_training_mode must be 'intermittent', 'final_only', "
+                "or 'disabled'"
             )
         if final_policy_network_train_steps is None:
             final_policy_network_train_steps = policy_network_train_steps
@@ -214,6 +222,7 @@ class DeepCFRSolver(policy.Policy):
         self._policy_network_train_every = int(policy_network_train_every)
         self._evaluation_interval = int(evaluation_interval)
         self._policy_training_mode = str(policy_training_mode)
+        self._collect_strategy_replay = bool(collect_strategy_replay)
         self._final_policy_network_train_steps = int(final_policy_network_train_steps)
         self._advantage_network_train_steps = int(advantage_network_train_steps)
         self._num_players = game.num_players()
@@ -521,8 +530,9 @@ class DeepCFRSolver(policy.Policy):
         post_player_update_callback: Optional[
             Callable[["DeepCFRSolver", int, int], None]
         ] = None,
+        max_training_seconds: Optional[float] = None,
     ) -> SolveResult:
-        """Runs one fixed-budget Deep CFR training phase.
+        """Runs one iteration- or active-time-budgeted Deep CFR training phase.
 
         ``post_iteration_callback``, when supplied, is called after the policy
         training decision for each completed CFR iteration and receives the
@@ -535,7 +545,14 @@ class DeepCFRSolver(policy.Policy):
         the updated player, and the one-indexed CFR iteration. This phase-aware
         hook is used by SD-CFR to archive the iteration strategy represented by
         each player's newly fitted advantage network.
+
+        If ``max_training_seconds`` is supplied, training stops after the first
+        complete two-player CFR iteration whose elapsed time reaches the
+        boundary. Callback and archive-capture time is deliberately included:
+        retaining historical networks is an intrinsic cost of SD-CFR.
         """
+        if max_training_seconds is not None and float(max_training_seconds) <= 0.0:
+            raise ValueError("max_training_seconds must be positive")
         start_time = time.perf_counter()
         advantage_losses: Dict[int, List[float]] = collections.defaultdict(list)
         policy_losses_at_checkpoints: List[Optional[float]] = []
@@ -578,7 +595,9 @@ class DeepCFRSolver(policy.Policy):
 
             # Train the average-policy network either intermittently or once
             # at the end, depending on the experiment.
-            if self._policy_training_mode == "final_only":
+            if self._policy_training_mode == "disabled":
+                train_now = False
+            elif self._policy_training_mode == "final_only":
                 train_now = it == self._num_iterations - 1
             else:
                 train_now = (((it + 1) % self._policy_network_train_every) == 0) or (
@@ -614,6 +633,12 @@ class DeepCFRSolver(policy.Policy):
 
             if post_iteration_callback is not None:
                 post_iteration_callback(self, int(self._iteration - 1))
+
+            if (
+                max_training_seconds is not None
+                and (time.perf_counter() - start_time) >= float(max_training_seconds)
+            ):
+                break
 
             if not evaluate_now:
                 continue
@@ -838,13 +863,14 @@ class DeepCFRSolver(policy.Policy):
         else:
             probs = probs / total
         sampled_action = int(np.random.choice(self._num_actions, p=probs))
-        self._strategy_memories.add(
-            StrategyMemory(
-                state.information_state_tensor(other_player),
-                int(self._iteration),
-                strategy,
+        if self._collect_strategy_replay:
+            self._strategy_memories.add(
+                StrategyMemory(
+                    state.information_state_tensor(other_player),
+                    int(self._iteration),
+                    strategy,
+                )
             )
-        )
         return self._traverse_game_tree(state.child(sampled_action), player)
 
     def _sample_action_from_advantage(

@@ -145,9 +145,14 @@ The repository is organised so that each experiment can be run independently whi
 │           ├── statistics.py
 │           ├── run.py
 │           └── README.md
-│       └── single_deep_cfr_comparison/              # Experiment 28
+│       ├── single_deep_cfr_comparison/              # Experiment 28
 │           ├── config.py
 │           ├── run.py
+│           └── README.md
+│       └── single_deep_cfr_uniform_36h_trajectory/  # Experiment 29
+│           ├── config.py
+│           ├── run.py
+│           ├── cloud.py
 │           └── README.md
 ├── tests/                                            # pytest suite
 ├── docs/
@@ -415,6 +420,23 @@ historical-network archives are also saved.
 weights are held fixed, does eliminating the separately fitted average-policy
 network improve exploitability; and how does canonical linearly weighted
 SD-CFR compare?
+
+### 29. Selected uniform SD-CFR five-seed 36-hour trajectory
+
+[`experiments/leduc_poker/single_deep_cfr_uniform_36h_trajectory/`](experiments/leduc_poker/single_deep_cfr_uniform_36h_trajectory/README.md)
+
+Extends the uniformly weighted SD-CFR arm selected by Experiment 28 to 36
+active training hours over the five established seeds. The Experiment 28
+advantage learner is frozen unchanged. Because standalone SD-CFR represents
+its output strategy through the complete archive of historical advantage
+networks, average-policy fitting, strategy replay, and exploitability
+calculation are removed from the timed learner. Archive-prefix checkpoints are
+recorded every 30 minutes and evaluated exactly after training under both
+uniform and canonical linear weighting.
+
+**Question:** does the selected uniformly weighted SD-CFR candidate continue
+to improve over 36 hours, and is its long-horizon behaviour stable across
+seeds when measured against active time and nodes touched?
 
 ## Setup
 
@@ -1126,6 +1148,23 @@ export PARALLELISM=5
 # Resume the same RUN_ID after any infrastructure failure; completed seed
 # workers are detected from their SUCCESS.json files and are not retrained.
 ./gcp/run_single_deep_cfr_comparison.sh resume
+
+# Experiment 29 — selected uniform SD-CFR, five parallel 36-hour seeds
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="exp29-sdcfr36h-$(date -u '+%Y%m%d-%H%M%S')"
+export PARALLELISM=5
+
+# Mandatory local end-to-end smoke test
+./gcp/run_single_deep_cfr_uniform_36h_trajectory.sh smoke-local
+
+# Remote controller: cloud smoke -> train -> deferred evaluation -> aggregate
+./gcp/run_single_deep_cfr_uniform_36h_trajectory.sh run
+
+# The laptop may be disconnected after submission
+./gcp/run_single_deep_cfr_uniform_36h_trajectory.sh status
+
+# Reuse the same RUN_ID to recover failed stages without repeating completed ones
+./gcp/run_single_deep_cfr_uniform_36h_trajectory.sh resume
 ```
 
 Each CLI exposes overrides for the most commonly varied configuration values. See `--help` for the per-experiment flag list, and the experiment's own README for the full output catalogue.

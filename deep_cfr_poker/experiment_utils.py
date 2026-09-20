@@ -140,6 +140,7 @@ def make_solver(game, config) -> DeepCFRSolver:
         "policy_network_train_every": policy_network_train_every,
         "evaluation_interval": int(config["evaluation_interval"]),
         "policy_training_mode": str(config.get("policy_training_mode", "intermittent")),
+        "collect_strategy_replay": bool(config.get("collect_strategy_replay", True)),
         "final_policy_network_train_steps": (
             int(config["final_policy_network_train_steps"])
             if config.get("final_policy_network_train_steps") is not None
