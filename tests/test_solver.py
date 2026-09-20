@@ -159,6 +159,25 @@ def test_solve_post_iteration_callback_observes_straight_through_training(leduc_
     assert all(later[3] > earlier[3] for earlier, later in zip(observed, observed[1:]))
 
 
+def test_solve_post_player_update_callback_is_phase_accurate(leduc_game):
+    solver = _build_solver(leduc_game, num_iterations=3, num_traversals=2)
+    observed = []
+
+    def record_player_update(active_solver, player, iteration):
+        observed.append((player, iteration, active_solver._iteration))
+
+    solver.solve(post_player_update_callback=record_player_update)
+
+    assert observed == [
+        (0, 1, 1),
+        (1, 1, 1),
+        (0, 2, 2),
+        (1, 2, 2),
+        (0, 3, 3),
+        (1, 3, 3),
+    ]
+
+
 def test_final_only_policy_training_marks_intermediate_metrics_missing(leduc_game):
     solver = _build_solver(
         leduc_game,

@@ -203,6 +203,10 @@ class DeepCFRSolver(policy.Policy):
         self._batch_size_strategy = batch_size_strategy
         self._policy_network_type = str(policy_network_type).lower()
         self._advantage_network_type = str(advantage_network_type).lower()
+        self._policy_network_layers = tuple(int(x) for x in policy_network_layers)
+        self._advantage_network_layers = tuple(
+            int(x) for x in advantage_network_layers
+        )
         self._uses_shared_advantage_trunk = (
             self._advantage_network_type == "shared_trunk_player_heads"
         )
@@ -514,6 +518,9 @@ class DeepCFRSolver(policy.Policy):
         post_iteration_callback: Optional[
             Callable[["DeepCFRSolver", int], None]
         ] = None,
+        post_player_update_callback: Optional[
+            Callable[["DeepCFRSolver", int, int], None]
+        ] = None,
     ) -> SolveResult:
         """Runs one fixed-budget Deep CFR training phase.
 
@@ -522,6 +529,12 @@ class DeepCFRSolver(policy.Policy):
         solver plus its global completed-iteration count. This permits
         lightweight observation or snapshotting without splitting one training
         trajectory into multiple calls to :meth:`solve`.
+
+        ``post_player_update_callback``, when supplied, is called immediately
+        after one player's advantage-network update. It receives the solver,
+        the updated player, and the one-indexed CFR iteration. This phase-aware
+        hook is used by SD-CFR to archive the iteration strategy represented by
+        each player's newly fitted advantage network.
         """
         start_time = time.perf_counter()
         advantage_losses: Dict[int, List[float]] = collections.defaultdict(list)
@@ -557,6 +570,8 @@ class DeepCFRSolver(policy.Policy):
                     self.reinitialize_advantage_network(p)
 
                 advantage_losses[p].append(self._learn_advantage_network(p))
+                if post_player_update_callback is not None:
+                    post_player_update_callback(self, int(p), int(self._iteration))
 
             # End-of-iteration bookkeeping.
             self._iteration += 1

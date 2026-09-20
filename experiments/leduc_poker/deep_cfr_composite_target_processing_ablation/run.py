@@ -29,7 +29,7 @@ from experiments.leduc_poker.deep_cfr_target_processing_ablation.plotting import
     plot_target_processing_ablation,
 )
 from experiments.leduc_poker.deep_cfr_target_processing_ablation.run import (
-    _augment_result,
+    _augment_result as _augment_base_result,
     _filter_variants,
     _str2bool,
     _variant_config,
@@ -44,6 +44,28 @@ from .config import DEFAULT_CONFIG, DEFAULT_SEEDS, TARGET_PROCESSING_VARIANTS
 _LOGGER = logging.getLogger(
     "deep_cfr_poker.experiment.composite_target_processing"
 )
+
+
+def _augment_result(
+    result: dict,
+    variant_config,
+    final_window: int,
+    exploitability_threshold: float,
+) -> dict:
+    """Adds composite-architecture identity to the shared target diagnostics."""
+    result = _augment_base_result(
+        result,
+        variant_config,
+        final_window,
+        exploitability_threshold,
+    )
+    result["summary"]["policy_network_type"] = str(
+        variant_config.get("policy_network_type", "mlp")
+    )
+    result["summary"]["advantage_network_type"] = str(
+        variant_config.get("advantage_network_type", "mlp")
+    )
+    return result
 
 
 def parse_seeds(seed_string: Optional[str]) -> List[int]:

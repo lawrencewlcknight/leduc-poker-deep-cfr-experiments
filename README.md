@@ -138,11 +138,15 @@ The repository is organised so that each experiment can be run independently whi
 │       │   ├── config.py
 │       │   ├── run.py
 │       │   └── README.md
-│       └── deep_cfr_final_candidate_checkpoint_head_to_head/ # Experiment 27
+│       ├── deep_cfr_final_candidate_checkpoint_head_to_head/ # Experiment 27
 │           ├── config.py
 │           ├── train.py
 │           ├── analyse.py
 │           ├── statistics.py
+│           ├── run.py
+│           └── README.md
+│       └── single_deep_cfr_comparison/              # Experiment 28
+│           ├── config.py
 │           ├── run.py
 │           └── README.md
 ├── tests/                                            # pytest suite
@@ -394,6 +398,23 @@ OpenSpiel expected value. Statistical inference is performed at seed level;
 the ten within-seed checkpoint pairings are not treated as independent data.
 
 **Question:** does progressively lower exploitability in the final Deep CFR candidate correspond to statistically consistent improvement in direct head-to-head play?
+
+### 28. Leduc poker paired Deep CFR versus Single Deep CFR
+
+[`experiments/leduc_poker/single_deep_cfr_comparison/`](experiments/leduc_poker/single_deep_cfr_comparison/README.md)
+
+Trains one Experiment 26/27 final-candidate Deep CFR trajectory per seed while
+archiving each player's advantage network immediately after every player
+update. The conventional fitted average-policy network, a uniformly weighted
+SD-CFR mixture matched to its averaging rule, and the canonical linearly
+weighted SD-CFR mixture are evaluated at the same temporal checkpoints. Exact
+SD-CFR evaluation includes player-own-reach weighting; playable
+historical-network archives are also saved.
+
+**Question:** when traversal data, fitted advantage networks and averaging
+weights are held fixed, does eliminating the separately fitted average-policy
+network improve exploitability; and how does canonical linearly weighted
+SD-CFR compare?
 
 ## Setup
 
@@ -1073,6 +1094,57 @@ python -m experiments.leduc_poker.deep_cfr_final_candidate_checkpoint_head_to_he
   "172800" \
   "4000" \
   "16000"
+
+# Experiment 28 — paired Deep CFR versus Single Deep CFR
+python -m experiments.leduc_poker.single_deep_cfr_comparison.run
+
+# Experiment 28 — local quick smoke test
+python -m experiments.leduc_poker.single_deep_cfr_comparison.run \
+  --seeds 1234 \
+  --iterations 3 \
+  --traversals 4 \
+  --evaluation-interval 1 \
+  --policy-network-train-every 1 \
+  --policy-network-train-steps 1 \
+  --advantage-network-train-steps 1 \
+  --policy-network-layers 8,8 \
+  --advantage-network-layers 8,8 \
+  --batch-size-advantage 2 \
+  --batch-size-strategy 2 \
+  --memory-capacity 256 \
+  --output-root outputs/smoke_tests
+
+# Experiment 28 — GCP Batch quick smoke test
+./gcp/submit_batch_experiment.sh \
+  "smoke-exp28-sdcfr-$(date +%Y%m%d-%H%M%S)" \
+  "python -m experiments.leduc_poker.single_deep_cfr_comparison.run \
+    --seeds 1234 \
+    --iterations 3 \
+    --traversals 4 \
+    --evaluation-interval 1 \
+    --policy-network-train-every 1 \
+    --policy-network-train-steps 1 \
+    --advantage-network-train-steps 1 \
+    --policy-network-layers 8,8 \
+    --advantage-network-layers 8,8 \
+    --batch-size-advantage 2 \
+    --batch-size-strategy 2 \
+    --memory-capacity 256 \
+    --output-root outputs/cloud/smoke-exp28-sdcfr" \
+  "n2-standard-4" \
+  "3600" \
+  "4000" \
+  "16000"
+
+# Experiment 28 — GCP Batch five-seed full run
+./gcp/submit_batch_experiment.sh \
+  "leduc-deep-cfr-exp28-sdcfr-$(date +%Y%m%d-%H%M%S)" \
+  "python -m experiments.leduc_poker.single_deep_cfr_comparison.run \
+    --output-root outputs/cloud/leduc-deep-cfr-exp28-sdcfr" \
+  "n2-standard-4" \
+  "172800" \
+  "4000" \
+  "16000"
 ```
 
 Each CLI exposes overrides for the most commonly varied configuration values. See `--help` for the per-experiment flag list, and the experiment's own README for the full output catalogue.
@@ -1101,4 +1173,4 @@ is documented in [`docs/THESIS_ARTIFACTS.md`](docs/THESIS_ARTIFACTS.md).
 
 ## Academic interpretation
 
-Exploitability is the primary equilibrium-quality metric. Policy-value error and neural-network losses are useful diagnostics, but they should not be interpreted as evidence of Nash-equilibrium convergence on their own. Head-to-head expected value (experiment 2) is a separate, complementary signal: a low-exploitability checkpoint may still lose to specific earlier checkpoints in direct play. Policy-training frequency and final-only extraction (experiments 3 and 4) change the supervised fitting budget and timing for the average-policy network, advantage-network reinitialisation (experiment 5) changes the regret-approximation optimisation path, the fair warm-start ablation (experiment 6) tests checkpoint/resume fidelity, the learning-rate schedule ablation (experiment 7) changes the optimiser trajectory while holding the Deep CFR data-generation protocol fixed, the constrained random search (experiment 8) screens multiple implementation and optimisation choices under a practical compute budget, the target-processing ablation (experiment 9) changes only the supervised advantage-network targets seen during fitting, the replay/averaging ablation (experiment 10) changes only average-policy target weighting by default, the network-size ablation (experiment 11) changes only the policy and advantage MLP architecture, and experiments 12-17 isolate residual connections, layer normalisation, policy-vs-advantage architecture roles, shared advantage trunks, factorised advantage heads, and dropout. Experiments 18-20 test whether the strongest architecture signals combine into a better candidate baseline, then re-test target processing and average-strategy weighting on that improved baseline rather than assuming effects transfer unchanged from the original configuration. Experiments 21-24 run targeted hyperparameter searches around that best baseline, isolating policy extraction, advantage fitting, replay freshness, and constant learning-rate magnitude. In the thesis, report exploitability, head-to-head strength, supervised update budget, checkpoint fidelity, optimiser schedule, search-stage uncertainty, target-processing diagnostics, optional replay diagnostics, architecture-size diagnostics, and paired ablation differences as distinct quantities, and treat contrasts between them as empirical results rather than failure modes.
+Exploitability is the primary equilibrium-quality metric. Policy-value error and neural-network losses are useful diagnostics, but they should not be interpreted as evidence of Nash-equilibrium convergence on their own. Head-to-head expected value (experiment 2) is a separate, complementary signal: a low-exploitability checkpoint may still lose to specific earlier checkpoints in direct play. Policy-training frequency and final-only extraction (experiments 3 and 4) change the supervised fitting budget and timing for the average-policy network, advantage-network reinitialisation (experiment 5) changes the regret-approximation optimisation path, the fair warm-start ablation (experiment 6) tests checkpoint/resume fidelity, the learning-rate schedule ablation (experiment 7) changes the optimiser trajectory while holding the Deep CFR data-generation protocol fixed, the constrained random search (experiment 8) screens multiple implementation and optimisation choices under a practical compute budget, the target-processing ablation (experiment 9) changes only the supervised advantage-network targets seen during fitting, the replay/averaging ablation (experiment 10) changes only average-policy target weighting by default, the network-size ablation (experiment 11) changes only the policy and advantage MLP architecture, and experiments 12-17 isolate residual connections, layer normalisation, policy-vs-advantage architecture roles, shared advantage trunks, factorised advantage heads, and dropout. Experiments 18-20 test whether the strongest architecture signals combine into a better candidate baseline, then re-test target processing and average-strategy weighting on that improved baseline rather than assuming effects transfer unchanged from the original configuration. Experiments 21-24 run targeted hyperparameter searches around that best baseline, isolating policy extraction, advantage fitting, replay freshness, and constant learning-rate magnitude. Experiment 28 derives conventional Deep CFR and SD-CFR from identical advantage learning: its uniformly weighted SD-CFR arm isolates output-strategy representation, while its canonical linearly weighted arm additionally changes the averaging rule. Neither exact reach-weighted reconstruction should be conflated with a pointwise ensemble of historical networks. In the thesis, report exploitability, head-to-head strength, supervised update budget, checkpoint fidelity, optimiser schedule, search-stage uncertainty, target-processing diagnostics, optional replay diagnostics, architecture-size diagnostics, and paired ablation differences as distinct quantities, and treat contrasts between them as empirical results rather than failure modes.

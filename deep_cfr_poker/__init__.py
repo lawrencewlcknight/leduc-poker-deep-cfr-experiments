@@ -9,6 +9,7 @@ from .constants import (
     LEDUC_GAME_VALUE_PLAYER_0,
 )
 from .experiment_utils import cleanup_training_memory
+from .sd_cfr import SDCFRArchive, SampledSDCFRPolicy, exact_average_policy
 from .solver import DeepCFRSolver, SolveResult
 
 __all__ = [
@@ -21,4 +22,7 @@ __all__ = [
     "DEFAULT_EXPLOITABILITY_THRESHOLD",
     "DEFAULT_SOLVER_BATCH_SIZE",
     "cleanup_training_memory",
+    "SDCFRArchive",
+    "SampledSDCFRPolicy",
+    "exact_average_policy",
 ]
