@@ -85,6 +85,7 @@ repo_ref = os.environ["REPO_REF"]
 expected_module = os.environ.get("EXPECTED_MODULE", "")
 repo_url_q = shlex.quote(repo_url)
 repo_ref_q = shlex.quote(repo_ref)
+experiment_command_q = shlex.quote(experiment_command)
 
 script = f"""#!/usr/bin/env bash
 set -euxo pipefail
@@ -92,7 +93,8 @@ set -euxo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 echo "Starting job: {job_name}"
-echo "Experiment command: {experiment_command}"
+echo "Experiment command:"
+printf '%s\\n' {experiment_command_q}
 echo "Requested CPU milli: {cpu_milli}"
 echo "Requested memory MiB: {memory_mib}"
 
@@ -109,7 +111,8 @@ WORKDIR=/workspace
 mkdir -p "$WORKDIR"
 cd "$WORKDIR"
 
-git clone --depth 1 --branch {repo_ref_q} {repo_url_q} source-repo
+git clone --filter=blob:none {repo_url_q} source-repo
+git -C source-repo checkout --detach {repo_ref_q}
 cd source-repo
 
 echo "Repository source: {repo_url}"

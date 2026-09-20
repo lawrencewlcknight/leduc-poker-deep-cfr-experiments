@@ -13,6 +13,10 @@ from experiments.leduc_poker.single_deep_cfr_comparison.config import (
     DEFAULT_CONFIG,
     DEFAULT_SEEDS,
 )
+from experiments.leduc_poker.single_deep_cfr_comparison.recover_failed_run import (
+    export_recovery,
+    recover_seed,
+)
 from experiments.leduc_poker.single_deep_cfr_comparison.run import (
     _export,
     _load_worker_results,
@@ -74,6 +78,22 @@ def test_paired_sd_cfr_smoke_writes_playable_and_analysis_outputs(tmp_path):
     assert restored[0]["seed"] == 1234
     assert restored[0]["summary"] == result["summary"]
     assert restored[0]["curves"] == result["curves"]
+    recovered = recover_seed(
+        1234,
+        tmp_path / "sd_cfr_archives/seed_1234_sd_cfr_archive.pt",
+        tmp_path / "policy_snapshots/seed_1234_deep_cfr_policy.pt",
+    )
+    assert recovered["summary"]["deep_cfr_final_exploitability"] == pytest.approx(
+        result["summary"]["deep_cfr_final_exploitability"]
+    )
+    assert recovered["summary"][
+        "sd_cfr_uniform_final_exploitability"
+    ] == pytest.approx(result["summary"]["sd_cfr_uniform_final_exploitability"])
+    recovery_dir = tmp_path / "recovered_analysis"
+    export_recovery([recovered], tmp_path, recovery_dir)
+    assert (recovery_dir / "recovered_seed_summary.csv").exists()
+    assert (recovery_dir / "recovered_sd_cfr_curves.csv").exists()
+    assert (recovery_dir / "recovery_manifest.json").exists()
     for filename in (
         "seed_summary.csv",
         "checkpoint_curves.csv",

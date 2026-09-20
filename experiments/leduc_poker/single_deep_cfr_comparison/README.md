@@ -108,6 +108,35 @@ If a cloud task fails, retain the same `RUN_ID` and run
 checkpoint curve before calculating summary statistics, preventing a later
 analysis error from discarding an expensive training trajectory.
 
+## Recovering the original failed run
+
+The first cloud run saved all five final Deep CFR policy snapshots and complete
+SD-CFR archives before its reporting step failed. The recommended recovery
+runs entirely on a GCP VM, avoiding local Python and large-file download
+problems. After setting `PROJECT_ID`, `REGION`, `BUCKET`, `SA_EMAIL`, and the
+pushed `REPO_REF`, run:
+
+```bash
+export RECOVERY_JOB="exp28-recovery-$(date -u '+%Y%m%d-%H%M%S')"
+./gcp/run_exp28_recovery.sh run
+```
+
+The job downloads the source artefacts directly from GCS, evaluates one seed at
+a time and uploads only the lightweight recovered tables and charts. The
+laptop may be disconnected after submission. Retain `RECOVERY_JOB` and check:
+
+```bash
+./gcp/run_exp28_recovery.sh status
+```
+
+Results are written below
+`$BUCKET/$RECOVERY_JOB/outputs/cloud/$RECOVERY_JOB/`.
+
+The recovery includes exact conventional Deep CFR final metrics, exact uniform
+and linear SD-CFR trajectories by iteration, and paired final comparisons. It
+cannot reconstruct conventional Deep CFR temporal exploitability, nodes touched
+or checkpoint wall-clock times because those arrays existed only in memory.
+
 ## Outputs
 
 - `seed_summary.csv`
