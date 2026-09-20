@@ -103,6 +103,19 @@ def _build_parser() -> argparse.ArgumentParser:
         )
     )
     parser.add_argument("--output-root", default="outputs")
+    parser.add_argument(
+        "--run-dir",
+        default=None,
+        help="Write directly to this directory instead of creating a timestamped run.",
+    )
+    parser.add_argument(
+        "--aggregate-workers-root",
+        default=None,
+        help=(
+            "Do not train; aggregate durable seed result JSON files found below "
+            "this directory. Used by the parallel cloud launcher."
+        ),
+    )
     parser.add_argument("--seeds", default=None)
     parser.add_argument("--experiment-name", default=None)
     parser.add_argument("--iterations", type=int, default=None)
@@ -189,6 +202,54 @@ def _evaluate_policy(game, policy, value_target: float) -> dict:
         "policy_value": value,
         "policy_value_error": abs(value - value_target),
     }
+
+
+def _write_json_atomic(path: Path, payload) -> None:
+    """Write JSON through a temporary file so periodic uploads see whole files."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    with open(temporary, "w", encoding="utf-8") as handle:
+        json.dump(json_safe(payload), handle, indent=2)
+    temporary.replace(path)
+
+
+def _persist_seed_curves(seed: int, curves: Sequence[dict], run_dir: Path) -> Path:
+    """Persist expensive checkpoint measurements before summary calculations."""
+    path = run_dir / "seed_results" / f"seed_{seed}_checkpoint_curves.csv"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_dict_rows_csv(curves, path)
+    return path
+
+
+def _persist_seed_result(result: dict, run_dir: Path) -> Path:
+    path = run_dir / "seed_results" / f"seed_{result['seed']}_result.json"
+    _write_json_atomic(path, result)
+    return path
+
+
+def _load_worker_results(workers_root: Path, expected_seeds: Sequence[int]) -> list[dict]:
+    """Load one durable result per seed from independently executed workers."""
+    results_by_seed = {}
+    for path in sorted(workers_root.glob("**/seed_results/seed_*_result.json")):
+        with open(path, "r", encoding="utf-8") as handle:
+            result = json.load(handle)
+        seed = int(result["seed"])
+        if seed in results_by_seed:
+            raise ValueError(
+                f"Duplicate durable result for seed {seed}: "
+                f"{results_by_seed[seed][0]} and {path}"
+            )
+        results_by_seed[seed] = (path, result)
+
+    missing = sorted(set(int(seed) for seed in expected_seeds) - set(results_by_seed))
+    if missing:
+        raise FileNotFoundError(
+            f"Missing durable Experiment 28 result(s) for seed(s): {missing}"
+        )
+    unexpected = sorted(set(results_by_seed) - set(int(seed) for seed in expected_seeds))
+    if unexpected:
+        raise ValueError(f"Unexpected Experiment 28 seed result(s): {unexpected}")
+    return [results_by_seed[int(seed)][1] for seed in expected_seeds]
 
 
 def _run_seed(seed: int, config: dict, run_dir: Path) -> dict:
@@ -310,6 +371,11 @@ def _run_seed(seed: int, config: dict, run_dir: Path) -> dict:
                 )
             curve_rows.append(row)
 
+        # The checkpoint arrays are the expensive, irrecoverable part of a
+        # conventional Deep CFR trajectory. Save them before AUC/statistical
+        # summarisation so a reporting-layer exception cannot discard a run.
+        _persist_seed_curves(seed, curve_rows, run_dir)
+
         summary = {
             "seed": int(seed),
             "num_iterations": int(config["num_iterations"]),
@@ -356,7 +422,9 @@ def _run_seed(seed: int, config: dict, run_dir: Path) -> dict:
                     ),
                 }
             )
-        return {"seed": int(seed), "summary": summary, "curves": curve_rows}
+        result = {"seed": int(seed), "summary": summary, "curves": curve_rows}
+        _persist_seed_result(result, run_dir)
+        return result
     finally:
         close = getattr(solver, "close", None)
         if callable(close):
@@ -599,11 +667,23 @@ def main() -> int:
     args = _build_parser().parse_args()
     config = build_config(args)
     seeds = _parse_seeds(args.seeds)
-    run_dir = create_run_dir(Path(args.output_root), str(config["experiment_name"]))
+    if args.run_dir:
+        run_dir = Path(args.run_dir)
+        run_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        run_dir = create_run_dir(Path(args.output_root), str(config["experiment_name"]))
     configure_run_logging(run_dir, verbose=args.verbose)
     _LOGGER.info("Output directory: %s", run_dir.resolve())
     _LOGGER.info("Configuration: %s", config)
     _LOGGER.info("Seeds: %s", seeds)
+
+    if args.aggregate_workers_root:
+        workers_root = Path(args.aggregate_workers_root)
+        _LOGGER.info("Aggregating durable worker results from %s", workers_root)
+        results = _load_worker_results(workers_root, seeds)
+        _export(results, [], config, seeds, run_dir)
+        _LOGGER.info("Aggregated %d seed results into %s", len(results), run_dir)
+        return 0
 
     results = []
     failed = []

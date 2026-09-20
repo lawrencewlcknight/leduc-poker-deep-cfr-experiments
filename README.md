@@ -1114,37 +1114,18 @@ python -m experiments.leduc_poker.single_deep_cfr_comparison.run \
   --memory-capacity 256 \
   --output-root outputs/smoke_tests
 
-# Experiment 28 — GCP Batch quick smoke test
-./gcp/submit_batch_experiment.sh \
-  "smoke-exp28-sdcfr-$(date +%Y%m%d-%H%M%S)" \
-  "python -m experiments.leduc_poker.single_deep_cfr_comparison.run \
-    --seeds 1234 \
-    --iterations 3 \
-    --traversals 4 \
-    --evaluation-interval 1 \
-    --policy-network-train-every 1 \
-    --policy-network-train-steps 1 \
-    --advantage-network-train-steps 1 \
-    --policy-network-layers 8,8 \
-    --advantage-network-layers 8,8 \
-    --batch-size-advantage 2 \
-    --batch-size-strategy 2 \
-    --memory-capacity 256 \
-    --output-root outputs/cloud/smoke-exp28-sdcfr" \
-  "n2-standard-4" \
-  "3600" \
-  "4000" \
-  "16000"
+# Experiment 28 — resilient cloud smoke, five parallel seeds and aggregation
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="exp28-sdcfr-$(date -u '+%Y%m%d-%H%M%S')"
+export PARALLELISM=5
+./gcp/run_single_deep_cfr_comparison.sh run
 
-# Experiment 28 — GCP Batch five-seed full run
-./gcp/submit_batch_experiment.sh \
-  "leduc-deep-cfr-exp28-sdcfr-$(date +%Y%m%d-%H%M%S)" \
-  "python -m experiments.leduc_poker.single_deep_cfr_comparison.run \
-    --output-root outputs/cloud/leduc-deep-cfr-exp28-sdcfr" \
-  "n2-standard-4" \
-  "172800" \
-  "4000" \
-  "16000"
+# Monitor the remote workflow (the laptop may be disconnected after submission)
+./gcp/run_single_deep_cfr_comparison.sh status
+
+# Resume the same RUN_ID after any infrastructure failure; completed seed
+# workers are detected from their SUCCESS.json files and are not retrained.
+./gcp/run_single_deep_cfr_comparison.sh resume
 ```
 
 Each CLI exposes overrides for the most commonly varied configuration values. See `--help` for the per-experiment flag list, and the experiment's own README for the full output catalogue.

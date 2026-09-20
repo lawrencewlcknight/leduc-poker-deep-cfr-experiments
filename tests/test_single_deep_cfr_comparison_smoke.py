@@ -13,7 +13,11 @@ from experiments.leduc_poker.single_deep_cfr_comparison.config import (
     DEFAULT_CONFIG,
     DEFAULT_SEEDS,
 )
-from experiments.leduc_poker.single_deep_cfr_comparison.run import _export, _run_seed
+from experiments.leduc_poker.single_deep_cfr_comparison.run import (
+    _export,
+    _load_worker_results,
+    _run_seed,
+)
 
 
 def test_default_config_uses_final_candidate_and_both_sd_cfr_weightings():
@@ -64,6 +68,12 @@ def test_paired_sd_cfr_smoke_writes_playable_and_analysis_outputs(tmp_path):
     assert "sd_cfr_linear_exploitability" in result["curves"][0]
     assert (tmp_path / "sd_cfr_archives/seed_1234_sd_cfr_archive.pt").exists()
     assert (tmp_path / "policy_snapshots/seed_1234_deep_cfr_policy.pt").exists()
+    assert (tmp_path / "seed_results/seed_1234_checkpoint_curves.csv").exists()
+    assert (tmp_path / "seed_results/seed_1234_result.json").exists()
+    restored = _load_worker_results(tmp_path, [1234])
+    assert restored[0]["seed"] == 1234
+    assert restored[0]["summary"] == result["summary"]
+    assert restored[0]["curves"] == result["curves"]
     for filename in (
         "seed_summary.csv",
         "checkpoint_curves.csv",

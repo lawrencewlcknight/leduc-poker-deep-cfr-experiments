@@ -228,7 +228,13 @@ def normalised_auc(x_values, y_values) -> float:
     x_range = x_values[-1] - x_values[0]
     if x_range == 0:
         return float("nan")
-    return float(np.trapz(y_values, x_values) / x_range)
+    # NumPy 2.0 introduced ``trapezoid`` and NumPy 2.4 removed the deprecated
+    # ``trapz`` alias. Keep experiment analysis compatible with both the older
+    # thesis environments and current clean cloud installations.
+    trapezoid = getattr(np, "trapezoid", None)
+    if trapezoid is None:  # NumPy < 2.0
+        trapezoid = np.trapz
+    return float(trapezoid(y_values, x_values) / x_range)
 
 
 def run_single_seed(

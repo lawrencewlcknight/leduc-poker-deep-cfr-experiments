@@ -1,7 +1,9 @@
 # Pinned to compatible ranges. For exact reproducibility of the canonical
 # multi-seed validation run, regenerate a `requirements.lock` from the
 # environment used to produce the published curves with `pip freeze`.
-numpy>=1.24,<3.0
+# Pinned because experiment outputs must not depend on resolver-time API drift.
+# In particular, NumPy 2.4 removed the deprecated np.trapz alias.
+numpy==1.26.4
 scipy>=1.10,<2.0
 matplotlib>=3.7,<4.0
 torch>=2.0,<3.0

@@ -79,7 +79,24 @@ def test_normalised_auc_drops_nan_and_normalises_by_range():
         np.array([0.0, 1.0, 2.0, 3.0]),
         np.array([1.0, 2.0, float("nan"), 4.0]),
     )
-    assert auc == pytest.approx(np.trapz([1.0, 2.0, 4.0], [0.0, 1.0, 3.0]) / 3.0)
+    assert auc == pytest.approx(7.5 / 3.0)
+
+
+def test_normalised_auc_uses_modern_numpy_trapezoid_when_available(monkeypatch):
+    calls = []
+
+    def modern_trapezoid(y_values, x_values):
+        calls.append((list(y_values), list(x_values)))
+        return 6.0
+
+    def removed_trapz(*_args, **_kwargs):
+        raise AssertionError("the deprecated np.trapz alias must not be used")
+
+    monkeypatch.setattr(np, "trapezoid", modern_trapezoid, raising=False)
+    monkeypatch.setattr(np, "trapz", removed_trapz, raising=False)
+
+    assert normalised_auc([0.0, 2.0], [1.0, 5.0]) == pytest.approx(3.0)
+    assert calls == [([1.0, 5.0], [0.0, 2.0])]
 
 
 def test_resolve_solver_batch_sizes_falls_back_to_positive_minibatches():

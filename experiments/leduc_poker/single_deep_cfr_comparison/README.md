@@ -83,45 +83,30 @@ python -m experiments.leduc_poker.single_deep_cfr_comparison.run \
 python -m experiments.leduc_poker.single_deep_cfr_comparison.run
 ```
 
-## GCP Batch smoke test
+## Resilient GCP Batch run
 
 After setting `PROJECT_ID`, `REGION`, `BUCKET`, `SA_EMAIL`, and `REPO_REF`:
 
 ```bash
-./gcp/submit_batch_experiment.sh \
-  "smoke-exp28-sdcfr-$(date +%Y%m%d-%H%M%S)" \
-  "python -m experiments.leduc_poker.single_deep_cfr_comparison.run \
-    --seeds 1234 \
-    --iterations 3 \
-    --traversals 4 \
-    --evaluation-interval 1 \
-    --policy-network-train-every 1 \
-    --policy-network-train-steps 1 \
-    --advantage-network-train-steps 1 \
-    --policy-network-layers 8,8 \
-    --advantage-network-layers 8,8 \
-    --batch-size-advantage 2 \
-    --batch-size-strategy 2 \
-    --memory-capacity 256 \
-    --output-root outputs/cloud/smoke-exp28-sdcfr" \
-  "n2-standard-4" \
-  "3600" \
-  "4000" \
-  "16000"
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="exp28-sdcfr-$(date -u '+%Y%m%d-%H%M%S')"
+export PARALLELISM=5
+./gcp/run_single_deep_cfr_comparison.sh run
 ```
 
-## GCP Batch full run
+The remote controller runs a cloud smoke test, launches one `n2-standard-4` VM
+per seed, and aggregates the five durable worker results. The laptop may be
+disconnected immediately after the controller is submitted. Monitor with:
 
 ```bash
-./gcp/submit_batch_experiment.sh \
-  "leduc-deep-cfr-exp28-sdcfr-$(date +%Y%m%d-%H%M%S)" \
-  "python -m experiments.leduc_poker.single_deep_cfr_comparison.run \
-    --output-root outputs/cloud/leduc-deep-cfr-exp28-sdcfr" \
-  "n2-standard-4" \
-  "172800" \
-  "4000" \
-  "16000"
+./gcp/run_single_deep_cfr_comparison.sh status
 ```
+
+If a cloud task fails, retain the same `RUN_ID` and run
+`./gcp/run_single_deep_cfr_comparison.sh resume`. Successful workers have a
+`SUCCESS.json` marker and are not retrained. Each worker also writes its raw
+checkpoint curve before calculating summary statistics, preventing a later
+analysis error from discarding an expensive training trajectory.
 
 ## Outputs
 
@@ -135,6 +120,8 @@ After setting `PROJECT_ID`, `REGION`, `BUCKET`, `SA_EMAIL`, and `REPO_REF`:
 - `final_exploitability_paired.png`
 - `sd_cfr_archives/seed_<seed>_sd_cfr_archive.pt`
 - `policy_snapshots/seed_<seed>_deep_cfr_policy.pt`
+- `seed_results/seed_<seed>_checkpoint_curves.csv` and
+  `seed_results/seed_<seed>_result.json` (durable per-seed recovery files)
 - `experiment_metadata.json`, `experiment.log`, and optional
   `failed_seeds.json`
 
