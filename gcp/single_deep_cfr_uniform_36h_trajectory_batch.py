@@ -45,7 +45,12 @@ $SUDO apt-get install -y git ca-certificates python3-pip python3-dev python3-ven
 mkdir -p "$WORK_ROOT" "$MPLCONFIGDIR" "$XDG_CACHE_HOME" "$PIP_CACHE_DIR"
 git clone --filter=blob:none "$REPO_URL" "$REPOSITORY"
 git -C "$REPOSITORY" checkout --detach "$REPO_REF"
-python3 -m venv --copies "$VENV_ROOT"
+# Google Batch images may place a launcher named ``python3`` earlier on PATH
+# without a usable sys._base_executable. Use Debian's installed interpreter
+# explicitly so venv can always locate the executable it must copy.
+unset PYTHONHOME PYTHONPATH __PYVENV_LAUNCHER__
+SYSTEM_PYTHON=/usr/bin/python3
+"$SYSTEM_PYTHON" -m venv --copies "$VENV_ROOT"
 source "$VENV_ROOT/bin/activate"
 python -m pip install --upgrade pip setuptools wheel
 python -m pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu \
@@ -250,4 +255,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
